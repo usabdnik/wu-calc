@@ -1,0 +1,17 @@
+{
+  "name": "WU Калькулятор баллов",
+  "short_name": "WU Calc",
+  "description": "Workout Unlimited — калькулятор баллов с голосовым вводом",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#14b8a6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23020617'/><text x='96' y='120' text-anchor='middle' font-size='100' font-family='system-ui' fill='%2314b8a6'>W</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
