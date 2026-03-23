@@ -101,6 +101,24 @@ function parseVoice(text){
   const r=[];for(let i=0;i<mk.length;i++){const s=mk[i].pos+mk[i].len;const e=i<mk.length-1?mk[i+1].pos:lo.length;const c=text.substring(s,e).trim();if(c)r.push({sl:mk[i].sl,raw:c});}return r;
 }
 function splitEls(raw){return raw.split(/\s*(?:,|потом|далее|затем|дальше|следующий|следующая|и\s+потом)\s*/i).map(s=>s.trim()).filter(s=>s.length>0);}
+function smartSplit(raw,idx){
+  const chunks=splitEls(raw);const all=[];
+  for(const chunk of chunks){
+    const words=norm(chunk).split(/\s+/).filter(Boolean);
+    if(!words.length)continue;
+    let i=0;
+    while(i<words.length){
+      let found=false;
+      for(let len=Math.min(6,words.length-i);len>=1;len--){
+        const phrase=words.slice(i,i+len).join(" ");
+        const m=findBest(phrase,idx,0.55);
+        if(m&&m.s>=0.55){all.push(phrase);i+=len;found=true;break;}
+      }
+      if(!found){all.push(words[i]);i++;}
+    }
+  }
+  return all;
+}
 
 /* ── Voice Panel ── */
 function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
@@ -231,7 +249,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
   const process=useCallback(()=>{
     if(!tx.trim())return;
     const chunks=parseVoice(tx);
-    const res=chunks.map(({sl,raw})=>{const qs=splitEls(raw);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});
+    const res=chunks.map(({sl,raw})=>{const qs=smartSplit(raw,sidx);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});
     setParsed(res);
   },[tx,sidx]);
 
@@ -252,7 +270,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
 
   const fEls=useMemo(()=>sq?ELS.filter(e=>norm(e.name).includes(norm(sq))).slice(0,30):ELS.slice(0,30),[sq]);
 
-  const processText=()=>{if(!ti.trim())return;setTx(ti);const chunks=parseVoice(ti);const res=chunks.map(({sl,raw})=>{const qs=splitEls(raw);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});setParsed(res);};
+  const processText=()=>{if(!ti.trim())return;setTx(ti);const chunks=parseVoice(ti);const res=chunks.map(({sl,raw})=>{const qs=smartSplit(raw,sidx);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});setParsed(res);};
 
   const voiceAvail=srOk===true;
 
