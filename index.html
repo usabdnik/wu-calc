@@ -88,10 +88,10 @@ function Pick({elements,selected,onAdd,onRemove,color,label}){
 
 /* ── Voice parsing ── */
 const SLOT_KW=[
-{ps:["группа а","группа a","связка 1","связка один","первая связка","первая группа"],sl:0},
-{ps:["группа с","группа c","связка 2","связка два","вторая связка","вторая группа"],sl:1},
-{ps:["группа е","группа e","связка 3","связка три","третья связка","третья группа"],sl:2},
-{ps:["группа г","группа g","связка 4","связка четыре","четвёртая связка","четвертая группа"],sl:3}];
+{ps:["группа а","группа a","связка 1","связка один","связка 1н","первая связка","первая группа","1 связка","1 группа","группа 1"],sl:0},
+{ps:["группа с","группа c","связка 2","связка два","связка 2а","вторая связка","вторая группа","2 связка","2 группа","группа 2"],sl:1},
+{ps:["группа е","группа e","связка 3","связка три","связка 3и","третья связка","третья группа","3 связка","3 группа","группа 3"],sl:2},
+{ps:["группа г","группа g","связка 4","связка четыре","связка 4е","четвёртая связка","четвертая связка","четвертая группа","4 связка","4 группа","группа 4"],sl:3}];
 
 function parseVoice(text){
   const lo=norm(text);const mk=[];
@@ -255,6 +255,15 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
 
   const unr=useMemo(()=>{if(!parsed)return[];const it=[];parsed.forEach((c,ci)=>c.ms.forEach((m,mi)=>{if(!m.el)it.push({ci,mi,q:m.q});}));return it;},[parsed]);
   const au=uri!==null?unr[uri]:null;
+  const[editCI,setEditCI]=useState(null);const[editMI,setEditMI]=useState(null);const[editSq,setEditSq]=useState("");
+  const editEls=useMemo(()=>editSq?ELS.filter(e=>norm(e.name).includes(norm(editSq))).slice(0,30):ELS.slice(0,30),[editSq]);
+  const startEdit=(ci,mi,q)=>{setEditCI(ci);setEditMI(mi);setEditSq(q);setUri(null);setSq("");};
+  const applyEdit=(el)=>{
+    setParsed(parsed.map((c,i)=>i!==editCI?c:{...c,ms:c.ms.map((m,j)=>j!==editMI?m:{...m,el,m:{el,s:1,ex:true}})}));
+    setEditCI(null);setEditMI(null);setEditSq("");
+  };
+  const cancelEdit=()=>{setEditCI(null);setEditMI(null);setEditSq("");};
+  const removeEl=(ci,mi)=>{setParsed(parsed.map((c,i)=>i!==ci?c:{...c,ms:c.ms.filter((_,j)=>j!==mi)}));};
 
   const resolve=(ci,mi,el)=>{
     const q=parsed[ci].ms[mi].q;onAddSyn(q,el.name);
@@ -290,15 +299,23 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
       {ti.trim()&&<button onClick={processText} style={{marginTop:10,width:"100%",padding:"10px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",cursor:"pointer",fontSize:13,fontWeight:600,background:"rgba(20,184,166,0.15)",color:"#14b8a6"}}>🔍 Распознать элементы</button>}
     </div>)}
 
-    {/* Live voice transcript */}
-    {(tx||itx)&&!parsed&&(<div style={{padding:"12px 20px"}}><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Распознано:</div><div style={{padding:12,background:"#0f172a",borderRadius:10,border:"1px solid #1e293b",fontSize:13,color:"#e2e8f0",lineHeight:1.6,minHeight:40}}>{tx}{itx&&<span style={{color:"#64748b",fontStyle:"italic"}}> {itx}</span>}</div>
+    {/* Live voice transcript — editable */}
+    {(tx||itx)&&!parsed&&(<div style={{padding:"12px 20px"}}><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>{on?"Распознано:":"Распознано (можно отредактировать):"}</div>
+      {on?(<div style={{padding:12,background:"#0f172a",borderRadius:10,border:"1px solid #1e293b",fontSize:13,color:"#e2e8f0",lineHeight:1.6,minHeight:40}}>{tx}{itx&&<span style={{color:"#64748b",fontStyle:"italic"}}> {itx}</span>}</div>):(
+        <textarea value={tx} onChange={e=>setTx(e.target.value)} rows={Math.max(2,Math.ceil(tx.length/40))} style={{width:"100%",padding:"10px 14px",background:"#0f172a",border:"1px solid #334155",borderRadius:10,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}/>
+      )}
       {!on&&tx&&<button onClick={process} style={{marginTop:10,width:"100%",padding:"10px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",cursor:"pointer",fontSize:13,fontWeight:600,background:"rgba(20,184,166,0.15)",color:"#14b8a6"}}>🔍 Распознать элементы</button>}
     </div>)}
 
-    {parsed&&(<div style={{padding:"12px 20px 20px"}}><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.05em"}}>Найденные элементы:</div>
+    {parsed&&(<div style={{padding:"12px 20px 20px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontSize:11,color:"#64748b",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Найденные элементы:</span><button onClick={()=>{setParsed(null);setEditCI(null);setEditMI(null);}} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:11,cursor:"pointer"}}>✏️ Редактировать текст</button></div>
       {parsed.map((ch,ci)=>(<div key={ci} style={{marginBottom:12}}><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}><div style={{width:8,height:8,borderRadius:2,background:SC[ch.sl]}}/><span style={{fontSize:12,fontWeight:600,color:SC[ch.sl]}}>{SN[ch.sl]}</span></div>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>{ch.ms.map((m,mi)=>(<div key={mi} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:m.el?"rgba(20,184,166,0.06)":"rgba(239,68,68,0.06)",border:`1px solid ${m.el?"rgba(20,184,166,0.2)":"rgba(239,68,68,0.2)"}`,borderRadius:10}}><span style={{fontSize:12,color:"#64748b",flex:"0 0 auto"}}>"{m.q}"</span><span style={{fontSize:14,color:"#475569"}}>→</span>
-          {m.el?(<div style={{flex:1,display:"flex",alignItems:"center",gap:6,minWidth:0}}><span style={{fontSize:12,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.el.name}</span><span style={{fontSize:11,fontWeight:700,color:"#f59e0b",flexShrink:0}}>{m.el.score}</span>{m.m&&!m.m.ex&&<span style={{fontSize:10,color:"#64748b",flexShrink:0}}>~{Math.round(m.m.s*100)}%</span>}</div>):(<button onClick={()=>{const i=unr.findIndex(u=>u.ci===ci&&u.mi===mi);setUri(i>=0?i:null);setSq(m.q);}} style={{flex:1,padding:"4px 10px",borderRadius:8,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.1)",color:"#ef4444",fontSize:12,cursor:"pointer",textAlign:"left"}}>❌ Не найден — выбрать</button>)}
+          {m.el?(<div style={{flex:1,display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+            <span onClick={()=>startEdit(ci,mi,m.q)} style={{fontSize:12,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted",textUnderlineOffset:"3px",textDecorationColor:"#475569"}}>{m.el.name}</span>
+            <span style={{fontSize:11,fontWeight:700,color:"#f59e0b",flexShrink:0}}>{m.el.score}</span>
+            {m.m&&!m.m.ex&&<span style={{fontSize:10,color:"#64748b",flexShrink:0}}>~{Math.round(m.m.s*100)}%</span>}
+            <span onClick={()=>removeEl(ci,mi)} style={{cursor:"pointer",color:"#64748b",fontSize:14,lineHeight:1,marginLeft:"auto",flexShrink:0}}>×</span>
+          </div>):(<button onClick={()=>{const i=unr.findIndex(u=>u.ci===ci&&u.mi===mi);setUri(i>=0?i:null);setSq(m.q);}} style={{flex:1,padding:"4px 10px",borderRadius:8,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.1)",color:"#ef4444",fontSize:12,cursor:"pointer",textAlign:"left"}}>❌ Не найден — выбрать</button>)}
         </div>))}</div></div>))}
 
       {au&&(<div style={{marginTop:12,padding:16,background:"#0f172a",borderRadius:12,border:"1px solid #f59e0b"}}><div style={{fontSize:13,fontWeight:600,color:"#f59e0b",marginBottom:8}}>Что за элемент: "{au.q}"?</div>
@@ -308,7 +325,13 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
         <button onClick={()=>{setUri(null);setSq("");}} style={{marginTop:8,padding:"6px 14px",borderRadius:8,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Пропустить</button>
       </div>)}
 
-      {unr.length===0&&parsed.some(c=>c.ms.some(m=>m.el))&&(<button onClick={apply} style={{marginTop:12,width:"100%",padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:"linear-gradient(135deg,#14b8a6,#0d9488)",color:"#020617"}}>✓ Применить связки</button>)}
+      {editCI!==null&&(<div style={{marginTop:12,padding:16,background:"#0f172a",borderRadius:12,border:"1px solid #14b8a6"}}><div style={{fontSize:13,fontWeight:600,color:"#14b8a6",marginBottom:8}}>Заменить элемент:</div>
+        <input value={editSq} onChange={e=>setEditSq(e.target.value)} placeholder="Поиск в базе..." style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+        <div style={{maxHeight:200,overflowY:"auto"}}>{editEls.map(el=>(<div key={el.name} onClick={()=>applyEdit(el)} style={{padding:"6px 10px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1e293b",fontSize:12,color:"#cbd5e1"}} onMouseEnter={e=>e.currentTarget.style.background="#334155"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{el.name}</span><span style={{marginLeft:8,display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,padding:"1px 5px",borderRadius:4,background:el.cat==="Статика"?"rgba(20,184,166,0.15)":"rgba(245,158,11,0.15)",color:el.cat==="Статика"?"#14b8a6":"#f59e0b"}}>{el.cat==="Статика"?"С":"Д"}</span><span style={{fontWeight:700,color:"#f59e0b"}}>{el.score}</span></span></div>))}</div>
+        <button onClick={cancelEdit} style={{marginTop:8,padding:"6px 14px",borderRadius:8,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Отмена</button>
+      </div>)}
+
+      {editCI===null&&unr.length===0&&parsed.some(c=>c.ms.some(m=>m.el))&&(<button onClick={apply} style={{marginTop:12,width:"100%",padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:"linear-gradient(135deg,#14b8a6,#0d9488)",color:"#020617"}}>✓ Применить связки</button>)}
       {unr.length>0&&(<div style={{marginTop:8,fontSize:12,color:"#f59e0b",textAlign:"center"}}>Осталось определить: {unr.length} элемент(ов)</div>)}
     </div>)}
   </div>);
