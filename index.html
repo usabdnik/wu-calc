@@ -51,8 +51,9 @@ const SC=["#14b8a6","#f59e0b","#a78bfa","#f472b6"];
 /* ── Fuzzy ── */
 function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>i);for(let j=1;j<=n;j++){let p=d[0];d[0]=j;for(let i=1;i<=m;i++){const t=d[i];d[i]=a[i-1]===b[j-1]?p:1+Math.min(p,d[i],d[i-1]);p=t;}}return d[m];}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е").replace(/[.\-_\/\\,;:!?()]/g," ").replace(/\s+/g," ").trim();}
-function buildIdx(els,syn){return els.map(el=>{const n=norm(el.name),w=n.split(" "),sk=[];for(const[k,v]of Object.entries(syn))if(v===el.name)sk.push(norm(k));return{el,n,w,sk};});}
-function findBest(q,idx,th=0.45){const qn=norm(q);if(!qn)return null;let bs=0,be=null;for(const{el,n,w,sk}of idx){if(n===qn)return{el,s:1,ex:true};for(const s of sk)if(s===qn)return{el,s:1,ex:true};if(n.includes(qn)){const s=qn.length/n.length*0.95;if(s>bs){bs=s;be=el;}}for(const s of sk){if(s.includes(qn)||qn.includes(s)){const sc=Math.min(qn.length,s.length)/Math.max(qn.length,s.length)*0.9;if(sc>bs){bs=sc;be=el;}}const d=lev(qn,s),ml=Math.max(qn.length,s.length),sc=ml>0?(1-d/ml):0;if(sc>bs){bs=sc;be=el;}}const qw=qn.split(" ");let mw=0;for(const qi of qw)for(const wi of w){const d=lev(qi,wi),ml=Math.max(qi.length,wi.length);if(ml>0&&(1-d/ml)>0.7){mw++;break;}}if(qw.length>0){const ws=mw/Math.max(qw.length,w.length)*0.85;if(ws>bs){bs=ws;be=el;}}const d=lev(qn,n),ml=Math.max(qn.length,n.length),s=ml>0?(1-d/ml)*0.8:0;if(s>bs){bs=s;be=el;}}if(bs>=th&&be)return{el:be,s:bs,ex:false};return null;}
+function normNum(s){return(" "+norm(s)+" ").replace(/(?<=\s)(одну|одной|одного|одним|одном|одна|одно|один)(?=\s)/g,"1").replace(/(?<=\s)(двух|двум|двумя|двое|две|два)(?=\s)/g,"2").replace(/(?<=\s)(трех|трем|тремя|трое|три)(?=\s)/g,"3").replace(/(?<=\s)(четырех|четырем|четыре)(?=\s)/g,"4").replace(/\s+/g," ").trim();}
+function buildIdx(els,syn){return els.map(el=>{const n=normNum(el.name),w=n.split(" "),sk=[];for(const[k,v]of Object.entries(syn))if(v===el.name)sk.push(normNum(k));return{el,n,w,sk};});}
+function findBest(q,idx,th=0.45){const qn=normNum(q);if(!qn)return null;let bs=0,be=null;for(const{el,n,w,sk}of idx){if(n===qn)return{el,s:1,ex:true};for(const s of sk)if(s===qn)return{el,s:1,ex:true};if(n.includes(qn)){const s=qn.length/n.length*0.95;if(s>bs){bs=s;be=el;}}/* Bonus: query matches first word(s) of element — only full words, len>2 */if(qn.length>2&&n.startsWith(qn+" ")){const s=Math.max(0.55,qn.length/n.length*1.2);if(s>bs){bs=Math.min(s,0.75);be=el;}}for(const s of sk){if(s.includes(qn)||qn.includes(s)){const sc=Math.min(qn.length,s.length)/Math.max(qn.length,s.length)*0.9;if(sc>bs){bs=sc;be=el;}}const d=lev(qn,s),ml=Math.max(qn.length,s.length),sc=ml>0?(1-d/ml):0;if(sc>bs){bs=sc;be=el;}}const qw=qn.split(" ");let mw=0;for(const qi of qw)for(const wi of w){const d=lev(qi,wi),ml=Math.max(qi.length,wi.length);if(ml>0&&(1-d/ml)>0.7){mw++;break;}}if(qw.length>0){const ws=mw/Math.max(qw.length,w.length)*0.85;if(ws>bs){bs=ws;be=el;}}const d=lev(qn,n),ml=Math.max(qn.length,n.length),s=ml>0?(1-d/ml)*0.8:0;if(s>bs){bs=s;be=el;}}if(bs>=th&&be)return{el:be,s:bs,ex:false};return null;}
 
 /* ── Balance ── */
 function bal(sC,dC,lv){const mx=Math.max(sC,dC),mn=Math.min(sC,dC);if(mx===0)return 0;const r=(mx+mn)/Math.sqrt(2*(mx*mx+mn*mn));return(1-Math.acos(Math.min(1,Math.max(-1,r)))/Math.acos(Math.SQRT2/2))*lv;}
@@ -102,29 +103,34 @@ function parseVoice(text){
 }
 function splitEls(raw){return raw.split(/\s*(?:,|потом|далее|затем|дальше|следующий|следующая|и\s+потом)\s*/i).map(s=>s.trim()).filter(s=>s.length>0);}
 function smartSplit(raw,idx){
-  /* 1. Extract quoted phrases first — user explicitly grouped */
-  const quoted=[];const stripped=raw.replace(/[""«»"](.*?)[""«»"]/g,(_,g)=>{quoted.push(g.trim());return " __Q"+quoted.length+"__ ";});
+  /* 1. Extract quoted phrases — user explicitly grouped with «», "", "" */
+  const quoted=[];
+  const QTAG="\x00";/* null byte placeholder — survives norm() */
+  const stripped=raw.replace(/[""«»"\u201c\u201d](.*?)[""«»"\u201c\u201d]/g,(_,g)=>{quoted.push(g.trim());return " "+QTAG+quoted.length+QTAG+" ";});
   /* 2. Split by explicit delimiters */
   const chunks=splitEls(stripped);const all=[];
   for(const chunk of chunks){
-    const words=norm(chunk).split(/\s+/).filter(Boolean);
-    if(!words.length)continue;
-    let i=0;
-    while(i<words.length){
-      /* Check for quoted placeholder */
-      const w=words[i];const qm=w.match(/^__q(\d+)__$/);
-      if(qm){all.push(quoted[parseInt(qm[1])-1]);i++;continue;}
-      let found=false;
-      /* Try longest phrase first (up to 15 words for long element names) */
-      const maxLen=Math.min(15,words.length-i);
-      for(let len=maxLen;len>=1;len--){
-        const phrase=words.slice(i,i+len).join(" ");
-        /* Lower threshold for longer phrases — more forgiving */
-        const th=len>=4?0.4:len>=2?0.48:0.55;
-        const m=findBest(phrase,idx,th);
-        if(m&&m.s>=th){all.push(phrase);i+=len;found=true;break;}
+    /* Handle quoted placeholders before norm */
+    const parts=chunk.split(new RegExp(QTAG+"(\\d+)"+QTAG));
+    for(let p=0;p<parts.length;p++){
+      if(p%2===1){/* odd index = quoted number */
+        all.push(quoted[parseInt(parts[p])-1]);continue;
       }
-      if(!found){all.push(words[i]);i++;}
+      const words=norm(parts[p]).split(/\s+/).filter(Boolean);
+      if(!words.length)continue;
+      let i=0;
+      while(i<words.length){
+        let found=false;
+        const maxLen=Math.min(15,words.length-i);
+        /* Try longest phrase first — take first match above threshold */
+        for(let len=maxLen;len>=1;len--){
+          const phrase=words.slice(i,i+len).join(" ");
+          const th=len>=4?0.4:0.55;
+          const m=findBest(phrase,idx,th);
+          if(m&&m.s>=th){all.push(phrase);i+=len;found=true;break;}
+        }
+        if(!found){all.push(words[i]);i++;}
+      }
     }
   }
   return all;
