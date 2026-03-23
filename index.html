@@ -67,18 +67,49 @@ const LS={
 /* ── Gauge ── */
 function Gauge({value,max,color}){const p=max>0?Math.min(value/max,1):0;const C=2*Math.PI*54,o=C*(1-p*0.75);return(<svg viewBox="0 0 120 120" style={{width:160,height:160,transform:"rotate(135deg)"}}><circle cx="60" cy="60" r="54" fill="none" stroke="#1e293b" strokeWidth="10" strokeDasharray={`${C*0.75} ${C*0.25}`} strokeLinecap="round"/><circle cx="60" cy="60" r="54" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${C*0.75} ${C*0.25}`} strokeDashoffset={o} strokeLinecap="round" style={{transition:"stroke-dashoffset 0.8s"}}/></svg>);}
 
-/* ── Pick (manual) ── */
+/* ── Voice Search Hook ── */
+function useVoiceSearch(){
+  const[listening,setListening]=useState(false);
+  const recRef=useRef(null);const cbRef=useRef(null);
+  const SR=typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition);
+  const available=!!SR;
+  const start=useCallback((onResult)=>{
+    if(!SR)return;cbRef.current=onResult;
+    const r=new SR();r.lang="ru-RU";r.continuous=false;r.interimResults=true;r.maxAlternatives=3;
+    r.onresult=e=>{
+      let f="",im="";
+      for(let i=0;i<e.results.length;i++){if(e.results[i].isFinal)f+=e.results[i][0].transcript+" ";else im+=e.results[i][0].transcript;}
+      if(cbRef.current)cbRef.current(f.trim()||im.trim());
+    };
+    r.onend=()=>{setListening(false);recRef.current=null;};
+    r.onerror=()=>{setListening(false);recRef.current=null;};
+    recRef.current=r;
+    try{r.start();setListening(true);}catch(e){setListening(false);}
+  },[SR]);
+  const stop=useCallback(()=>{if(recRef.current)try{recRef.current.stop();}catch(e){}setListening(false);},[]);
+  return{available,listening,start,stop};
+}
+
+/* ── Pick (manual + voice search) ── */
 function Pick({elements,selected,onAdd,onRemove,color,label}){
   const[q,setQ]=useState("");const[open,setOpen]=useState(false);const ref=useRef(null);
-  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false)};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[]);
+  const voice=useVoiceSearch();
+  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target)){setOpen(false);if(voice.listening)voice.stop();}};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[voice]);
   const ids=useMemo(()=>new Set(selected.map(s=>s.name)),[selected]);
   const fil=useMemo(()=>elements.filter(e=>!ids.has(e.name)&&e.name.toLowerCase().includes(q.toLowerCase())).slice(0,50),[q,elements,ids]);
+  const toggleVoice=()=>{
+    if(voice.listening){voice.stop();return;}
+    voice.start((text)=>{setQ(text);setOpen(true);});
+  };
   return(<div style={{marginBottom:16}}>
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:4,height:20,borderRadius:2,background:color}}/><span style={{fontSize:13,fontWeight:600,color:"#94a3b8",letterSpacing:"0.05em",textTransform:"uppercase"}}>{label}</span><span style={{fontSize:12,color:"#475569",marginLeft:"auto"}}>{selected.length} эл.</span></div>
     <div ref={ref} style={{position:"relative"}}>
-      <input value={q} onChange={e=>{setQ(e.target.value);setOpen(true)}} onFocus={()=>setOpen(true)} placeholder="Поиск элемента..." style={{width:"100%",padding:"10px 14px",background:"#0f172a",border:"1px solid #334155",borderRadius:10,color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+      <div style={{display:"flex",gap:6}}>
+        <input value={q} onChange={e=>{setQ(e.target.value);setOpen(true)}} onFocus={()=>setOpen(true)} placeholder={voice.listening?"Говорите...":"Поиск элемента..."} style={{flex:1,padding:"10px 14px",background:voice.listening?"#0c1425":"#0f172a",border:`1px solid ${voice.listening?"rgba(20,184,166,0.5)":"#334155"}`,borderRadius:10,color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+        {voice.available&&<button onClick={toggleVoice} style={{width:44,height:44,borderRadius:10,border:`1px solid ${voice.listening?"rgba(239,68,68,0.4)":"rgba(20,184,166,0.3)"}`,background:voice.listening?"rgba(239,68,68,0.15)":"rgba(20,184,166,0.1)",color:voice.listening?"#ef4444":"#14b8a6",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,animation:voice.listening?"pulse 1.5s infinite":"none"}}>{voice.listening?"⏹":"🎤"}</button>}
+      </div>
       {open&&fil.length>0&&(<div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:"#1e293b",border:"1px solid #334155",borderRadius:10,marginTop:4,maxHeight:200,overflowY:"auto",boxShadow:"0 10px 40px rgba(0,0,0,0.4)"}}>
-        {fil.map(el=>(<div key={el.name} onClick={()=>{onAdd(el);setQ("");setOpen(false)}} style={{padding:"8px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #0f172a",fontSize:13,color:"#cbd5e1"}} onMouseEnter={e=>e.currentTarget.style.background="#334155"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{el.name}</span><span style={{marginLeft:8,display:"flex",gap:6,alignItems:"center",flexShrink:0}}><span style={{fontSize:11,padding:"2px 6px",borderRadius:6,background:el.cat==="Статика"?"rgba(20,184,166,0.15)":"rgba(245,158,11,0.15)",color:el.cat==="Статика"?"#14b8a6":"#f59e0b"}}>{el.cat==="Статика"?"С":"Д"}</span><span style={{fontWeight:700,color:"#f59e0b",minWidth:24,textAlign:"right"}}>{el.score}</span></span></div>))}
+        {fil.map(el=>(<div key={el.name} onClick={()=>{onAdd(el);setQ("");setOpen(false);if(voice.listening)voice.stop();}} style={{padding:"8px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #0f172a",fontSize:13,color:"#cbd5e1"}} onMouseEnter={e=>e.currentTarget.style.background="#334155"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{el.name}</span><span style={{marginLeft:8,display:"flex",gap:6,alignItems:"center",flexShrink:0}}><span style={{fontSize:11,padding:"2px 6px",borderRadius:6,background:el.cat==="Статика"?"rgba(20,184,166,0.15)":"rgba(245,158,11,0.15)",color:el.cat==="Статика"?"#14b8a6":"#f59e0b"}}>{el.cat==="Статика"?"С":"Д"}</span><span style={{fontWeight:700,color:"#f59e0b",minWidth:24,textAlign:"right"}}>{el.score}</span></span></div>))}
       </div>)}
     </div>
     {selected.length>0&&(<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
