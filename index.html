@@ -172,7 +172,7 @@ const AI_NAMES=ELS.map(e=>e.name);
 async function aiParse(transcript){
   const cfg=LS.get("wu-ai")||{};
   if(!cfg.url||!cfg.key)throw new Error("Настройте AI сервер в настройках (⚙️)");
-  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript,api_key:cfg.key,elements:AI_NAMES})});
+  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript,api_key:cfg.key})});
   if(!resp.ok)throw new Error("AI сервер: "+resp.status);
   return resp.json();
 }
