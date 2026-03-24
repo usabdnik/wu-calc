@@ -434,7 +434,7 @@ return(<div style={{marginBottom:20,padding:16,background:"#1e293b",borderRadius
 
 /* ── AI Settings Panel ── */
 function AISettings(){
-  const[cfg,setCfg]=useState(()=>LS.get("wu-ai")||{url:"",key:""});
+  const[cfg,setCfg]=useState(()=>LS.get("wu-ai")||{url:"http://195.133.76.56",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});
   const save=(k,v)=>{const n={...cfg,[k]:v};setCfg(n);LS.set("wu-ai",n);};
   return(<div style={{padding:16,background:"#1e293b",borderRadius:12,border:"1px solid #334155",marginBottom:16}}>
     <div style={{fontSize:12,fontWeight:600,color:"#a855f7",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.05em"}}>🤖 AI Сервер</div>
