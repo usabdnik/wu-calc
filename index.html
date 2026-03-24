@@ -434,7 +434,7 @@ return(<div style={{marginBottom:20,padding:16,background:"#1e293b",borderRadius
 
 /* ── AI Settings Panel ── */
 function AISettings(){
-  const[cfg,setCfg]=useState(()=>LS.get("wu-ai")||{url:"http://195.133.76.56",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});
+  const[cfg,setCfg]=useState(()=>{const saved=LS.get("wu-ai");if(saved&&saved.url&&saved.key)return saved;const def={url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"};LS.set("wu-ai",def);return def;});
   const save=(k,v)=>{const n={...cfg,[k]:v};setCfg(n);LS.set("wu-ai",n);};
   return(<div style={{padding:16,background:"#1e293b",borderRadius:12,border:"1px solid #334155",marginBottom:16}}>
     <div style={{fontSize:12,fontWeight:600,color:"#a855f7",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.05em"}}>🤖 AI Сервер</div>
@@ -445,6 +445,9 @@ function AISettings(){
     {cfg.url&&cfg.key&&<div style={{marginTop:8,fontSize:11,color:"#14b8a6"}}>✓ Настроено</div>}
   </div>);
 }
+
+/* ── AI defaults init ── */
+(function(){const s=LS.get("wu-ai");if(!s||!s.url||!s.key)LS.set("wu-ai",{url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});})();
 
 /* ── Main App ── */
 function App(){
