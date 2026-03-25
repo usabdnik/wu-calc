@@ -181,7 +181,7 @@ const AI_NAMES=ELS.map(e=>e.name);
 async function aiParse(transcript){
   const cfg=LS.get("wu-ai")||{};
   if(!cfg.url||!cfg.key)throw new Error("Настройте AI сервер в настройках (⚙️)");
-  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript,api_key:cfg.key})});
+  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript,api_key:cfg.key,include_slots:true})});
   if(!resp.ok)throw new Error("AI сервер: "+resp.status);
   return resp.json();
 }
@@ -302,21 +302,39 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
       const data=await aiParse(src);
       if(data.elements&&data.elements.length){
         const voiceChunks=parseVoice(src);
+        const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
         if(voiceChunks.length>1||voiceChunks[0].sl!==0||voiceChunks.length===1&&voiceChunks[0].raw!==src.trim()){
-          /* Distribute AI elements across voice-detected slots */
-          const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
-          let idx=0;const res=[];
-          for(const vc of voiceChunks){
-            const wordCount=vc.raw.split(/[\s,]+/).filter(Boolean).length;
-            const chunk={sl:vc.sl,ms:aiEls.slice(idx,idx+wordCount)};
-            if(chunk.ms.length)res.push(chunk);
-            idx+=wordCount;
+          /* Distribute AI elements across voice-detected slots by matching element names to chunk text */
+          const loSrc=norm(src);const slotRanges=[];
+          for(let i=0;i<voiceChunks.length;i++){
+            const vc=voiceChunks[i];const rawLo=norm(vc.raw);
+            const startPos=loSrc.indexOf(rawLo);
+            slotRanges.push({sl:vc.sl,start:startPos,end:startPos>=0?startPos+rawLo.length:loSrc.length});
           }
-          if(idx<aiEls.length)res.push({sl:voiceChunks.length>0?voiceChunks[voiceChunks.length-1].sl:0,ms:aiEls.slice(idx)});
-          setParsed(res.filter(r=>r.ms.length>0));
+          const buckets={};slotRanges.forEach(sr=>{if(!buckets[sr.sl])buckets[sr.sl]=[];});
+          const assigned=new Set();
+          /* For each AI element, find which chunk its name appears in (check spoken name, element name, or AI slot) */
+          for(let ei=0;ei<aiEls.length;ei++){
+            const ae=aiEls[ei];const aiSlot=data.elements[ei].slot;
+            if(aiSlot!=null&&buckets[aiSlot]!=null){buckets[aiSlot].push(ae);assigned.add(ei);continue;}
+            const eName=norm(ae.q);const elName=ae.el?norm(ae.el.name):"";
+            let bestSl=voiceChunks[0].sl;let found=false;
+            for(const sr of slotRanges){
+              const chunkText=loSrc.substring(sr.start,sr.end);
+              if(chunkText.includes(eName)||(elName&&chunkText.includes(elName))){bestSl=sr.sl;found=true;break;}
+            }
+            if(!buckets[bestSl])buckets[bestSl]=[];
+            buckets[bestSl].push(ae);assigned.add(ei);
+          }
+          /* Any unassigned go to last slot */
+          for(let ei=0;ei<aiEls.length;ei++){
+            if(!assigned.has(ei)){const lastSl=voiceChunks[voiceChunks.length-1].sl;if(!buckets[lastSl])buckets[lastSl]=[];buckets[lastSl].push(aiEls[ei]);}
+          }
+          const res=Object.entries(buckets).filter(([_,ms])=>ms.length>0).map(([sl,ms])=>({sl:parseInt(sl),ms}));
+          res.sort((a,b)=>a.sl-b.sl);
+          setParsed(res);
         }else{
-          const ms=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
-          setParsed([{sl:0,ms}]);
+          setParsed([{sl:0,ms:aiEls}]);
         }
         setStatus("🤖 AI нашёл "+data.elements.length+" элементов");
       }else{setStatus("AI не нашёл элементов");}
