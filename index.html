@@ -178,10 +178,12 @@ function smartSplit(raw,idx){
 
 /* ── AI Parse helper ── */
 const AI_NAMES=ELS.map(e=>e.name);
-async function aiParse(transcript){
+async function aiParse(transcript,synonyms){
   const cfg=LS.get("wu-ai")||{};
   if(!cfg.url||!cfg.key)throw new Error("Настройте AI сервер в настройках (⚙️)");
-  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript,api_key:cfg.key,include_slots:true})});
+  const body={transcript,api_key:cfg.key,include_slots:true};
+  if(synonyms&&Object.keys(synonyms).length>0)body.synonyms=synonyms;
+  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   if(!resp.ok)throw new Error("AI сервер: "+resp.status);
   return resp.json();
 }
@@ -299,7 +301,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     const src=text||(tx||ti).trim();if(!src){setStatus("Нет текста");return;}
     setAiLoading(true);setStatus("🤖 AI анализирует...");
     try{
-      const data=await aiParse(src);
+      const data=await aiParse(src,synonyms);
       if(data.elements&&data.elements.length){
         const voiceChunks=parseVoice(src);
         const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
