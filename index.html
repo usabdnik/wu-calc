@@ -91,12 +91,12 @@ function useVoiceSearch(){
 }
 
 /* ── Pick (manual + voice search) ── */
-function Pick({elements,selected,onAdd,onRemove,color,label}){
+function Pick({elements,selected,onAdd,onRemove,onMove,color,label,synonyms}){
   const[q,setQ]=useState("");const[open,setOpen]=useState(false);const ref=useRef(null);
   const voice=useVoiceSearch();
   useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target)){setOpen(false);if(voice.listening)voice.stop();}};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h);},[voice]);
   const ids=useMemo(()=>new Set(selected.map(s=>s.name)),[selected]);
-  const fil=useMemo(()=>{if(!q.trim())return elements.filter(e=>!ids.has(e.name)).slice(0,50);const qn=norm(q);return elements.filter(e=>!ids.has(e.name)&&norm(e.name).includes(qn)).slice(0,50);},[q,elements,ids]);
+  const fil=useMemo(()=>{if(!q.trim())return elements.filter(e=>!ids.has(e.name)).slice(0,50);const qn=norm(q);return elements.filter(e=>{if(ids.has(e.name))return false;if(norm(e.name).includes(qn))return true;if(synonyms){for(const[k,v]of Object.entries(synonyms)){if(v===e.name&&norm(k).includes(qn))return true;}}return false;}).slice(0,50);},[q,elements,ids,synonyms]);
   const toggleVoice=()=>{
     if(voice.listening){voice.stop();return;}
     voice.start((text)=>{if(text.length>=2){setQ(text);setOpen(true);}});
@@ -113,7 +113,7 @@ function Pick({elements,selected,onAdd,onRemove,color,label}){
       </div>)}
     </div>
     {selected.length>0&&(<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
-      {selected.map(el=>(<div key={el.name} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px 4px 10px",background:"rgba(30,41,59,0.8)",border:"1px solid #334155",borderRadius:8,fontSize:12,color:"#cbd5e1"}}><span style={{maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{el.name}</span><span style={{fontWeight:700,color:"#f59e0b",fontSize:11}}>{el.score}</span><span onClick={()=>onRemove(el.name)} style={{cursor:"pointer",color:"#64748b",fontSize:16,lineHeight:1,marginLeft:2}}>×</span></div>))}
+      {selected.map((el,idx)=>(<div key={el.name} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 6px 4px 10px",background:"rgba(30,41,59,0.8)",border:"1px solid #334155",borderRadius:8,fontSize:12,color:"#cbd5e1"}}><div style={{display:"flex",flexDirection:"column",gap:0,marginRight:2}}>{idx>0&&<span onClick={()=>onMove(idx,idx-1)} style={{cursor:"pointer",color:"#64748b",fontSize:10,lineHeight:1,userSelect:"none"}}>▲</span>}{idx<selected.length-1&&<span onClick={()=>onMove(idx,idx+1)} style={{cursor:"pointer",color:"#64748b",fontSize:10,lineHeight:1,userSelect:"none"}}>▼</span>}</div><span style={{maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{el.name}</span><span style={{fontWeight:700,color:"#f59e0b",fontSize:11}}>{el.score}</span><span onClick={()=>onRemove(el.name)} style={{cursor:"pointer",color:"#64748b",fontSize:16,lineHeight:1,marginLeft:2}}>×</span></div>))}
     </div>)}
   </div>);
 }
@@ -428,9 +428,29 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
 }
 
 /* ── Synonym Panel ── */
-function SynPanel({syn,onRem}){const e=Object.entries(syn);if(!e.length)return null;
-return(<div style={{marginBottom:20,padding:16,background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}><div style={{fontSize:12,fontWeight:600,color:"#94a3b8",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Словарь синонимов ({e.length})</div>
-<div style={{display:"flex",flexWrap:"wrap",gap:6}}>{e.map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"rgba(15,23,42,0.6)",borderRadius:8,border:"1px solid #1e293b",fontSize:11}}><span style={{color:"#f59e0b"}}>{k}</span><span style={{color:"#475569"}}>→</span><span style={{color:"#94a3b8",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</span><span onClick={()=>onRem(k)} style={{cursor:"pointer",color:"#64748b",fontSize:14,lineHeight:1,marginLeft:2}}>×</span></div>))}</div></div>);}
+function SynPanel({syn,onRem,onAdd,elements}){
+  const[show,setShow]=useState(false);
+  const[filter,setFilter]=useState("");
+  const[newKey,setNewKey]=useState("");
+  const[newVal,setNewVal]=useState("");
+  const[addMode,setAddMode]=useState(false);
+  const e=Object.entries(syn);
+  const filtered=filter?e.filter(([k,v])=>k.includes(norm(filter))||norm(v).includes(norm(filter))):e;
+  const matchEls=useMemo(()=>newVal?elements.filter(el=>norm(el.name).includes(norm(newVal))).slice(0,20):elements.slice(0,20),[newVal,elements]);
+  return(<div style={{marginBottom:20}}>
+    <button onClick={()=>setShow(!show)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>Словарь синонимов ({e.length})</span><span style={{transform:show?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
+    {show&&(<div style={{marginTop:8,padding:16,background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}>
+      <button onClick={()=>setAddMode(!addMode)} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px dashed rgba(20,184,166,0.3)",background:addMode?"rgba(20,184,166,0.1)":"transparent",color:"#14b8a6",fontSize:12,fontWeight:600,cursor:"pointer",marginBottom:12}}>{addMode?"Отмена":"+ Добавить синоним"}</button>
+      {addMode&&(<div style={{padding:12,background:"#0f172a",borderRadius:10,border:"1px solid rgba(20,184,166,0.2)",marginBottom:12}}>
+        <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Слово/фраза (как говорите)</label><input value={newKey} onChange={e=>setNewKey(e.target.value)} placeholder='напр: "выход 1рука"' style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+        <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Элемент (что имеете в виду)</label><input value={newVal} onChange={e=>setNewVal(e.target.value)} placeholder="Поиск элемента..." style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
+        {newVal&&(<div style={{maxHeight:150,overflowY:"auto",marginBottom:8}}>{matchEls.map(el=>(<div key={el.name} onClick={()=>{if(newKey.trim()){onAdd(newKey.trim(),el.name);setNewKey("");setNewVal("");setAddMode(false);}}} style={{padding:"6px 10px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1e293b",fontSize:12,color:"#cbd5e1"}} onMouseEnter={e=>e.currentTarget.style.background="#334155"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><span>{el.name}</span><span style={{fontWeight:700,color:"#f59e0b",marginLeft:8}}>{el.score}</span></div>))}</div>)}
+      </div>)}
+      {e.length>5&&(<input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Поиск синонимов..." style={{width:"100%",padding:"8px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:12,outline:"none",boxSizing:"border-box",marginBottom:10}}/>)}
+      {filtered.length>0?(<div style={{display:"flex",flexWrap:"wrap",gap:6}}>{filtered.map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"rgba(15,23,42,0.6)",borderRadius:8,border:"1px solid #1e293b",fontSize:11}}><span style={{color:"#f59e0b"}}>{k}</span><span style={{color:"#475569"}}>→</span><span style={{color:"#94a3b8",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</span><span onClick={()=>onRem(k)} style={{cursor:"pointer",color:"#64748b",fontSize:14,lineHeight:1,marginLeft:2}}>×</span></div>))}</div>):(<div style={{fontSize:12,color:"#475569",textAlign:"center",padding:8}}>{filter?"Ничего не найдено":"Нет синонимов"}</div>)}
+    </div>)}
+  </div>);
+}
 
 /* ── AI Settings Panel ── */
 function AISettings(){
@@ -453,6 +473,7 @@ function AISettings(){
 function App(){
   const[li,setLi]=useState(4);const[g,setG]=useState("M");const[slots,setSlots]=useState([[],[],[],[]]);
   const[showR,setShowR]=useState(false);const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);
+  const[penalties,setPenalties]=useState({dirty:0,fall:0,dq:false});
   const[syn,setSyn]=useState(()=>LS.get("wu-syn")||{});
 
   const saveSyn=useCallback(ns=>{setSyn(ns);LS.set("wu-syn",ns);},[]);
@@ -462,13 +483,18 @@ function App(){
   const lv=LEVELS[li];const minS=g==="M"?lv.minM:lv.minF;
   const all=useMemo(()=>slots.flat(),[slots]);
   const sC=all.filter(e=>e.cat==="Статика").length;const dC=all.filter(e=>e.cat==="Динамика").length;
-  const raw=all.reduce((s,e)=>s+e.score,0);const b=bal(sC,dC,lv.num);const tot=raw+b;
-  const fs=slots.filter(s=>s.length>0).length;
-  const divOk=fs>=3,sOk=minS<=0||tot>=minS,eOk=lv.minEl<=0||all.length>=lv.minEl;
+  const raw=all.reduce((s,e)=>s+e.score,0);const b=bal(sC,dC,lv.num);
+  const penaltyScore=penalties.dirty*2+penalties.fall*4;
+  const tot=raw+b-penaltyScore;
+  const comboOk=slots.some(s=>s.length>=3);
+  const sOk=minS<=0||tot>=minS;
+  const ownLevelCount=all.filter(e=>e.score===lv.num).length;
+  const eOk=lv.minEl<=0||ownLevelCount>=lv.minEl;
   const add=(i,el)=>setSlots(p=>{const n=[...p];n[i]=[...n[i],el];return n;});
   const rem=(i,nm)=>setSlots(p=>{const n=[...p];n[i]=n[i].filter(e=>e.name!==nm);return n;});
-  const reqs=[{l:"Отжимания",v:lv.otj},{l:"Подтягивания",v:lv.podt},{l:"Брусья",v:lv.br},{l:"Пресс",v:lv.pres},{l:"Выходы",v:lv.vyh}].filter(r=>r.v>0);
-  const allOk=sOk&&divOk&&eOk&&all.length>0;
+  const move=(i,from,to)=>setSlots(p=>{const n=[...p];const s=[...n[i]];const el=s[from];s.splice(from,1);s.splice(to,0,el);n[i]=s;return n;});
+  const reqs=[{l:"Мин. баллы ("+(g==="M"?"М":"Ж")+")",v:minS},{l:"Связка 3+ эл.",v:"Да"},{l:"Эл. "+lv.num+" разряда",v:lv.minEl}].filter(r=>r.v>0&&r.v!=="0");
+  const allOk=!penalties.dq&&sOk&&comboOk&&eOk&&all.length>0;
 
   return(<div style={{minHeight:"100vh",background:"linear-gradient(180deg,#020617 0%,#0f172a 40%)",color:"#e2e8f0",fontFamily:"system-ui,sans-serif"}}><div style={{maxWidth:480,margin:"0 auto",padding:"0 16px 40px"}}>
     <div style={{padding:"24px 0 20px",textAlign:"center",position:"relative"}}><div style={{fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#14b8a6",fontWeight:600,marginBottom:4}}>Workout Unlimited</div><h1 style={{fontSize:24,fontWeight:700,margin:0,color:"#e2e8f0"}}>Калькулятор баллов</h1><p style={{fontSize:12,color:"#475569",margin:"4px 0 0"}}>Голосовой ввод + AI — {ELS.length} элементов</p>
@@ -482,25 +508,54 @@ function App(){
 
     <div style={{background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:20,padding:24,marginBottom:20,border:"1px solid #334155",position:"relative",overflow:"hidden"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}><Gauge value={tot} max={Math.max(minS*1.5,1)} color={sOk?"#14b8a6":"#f59e0b"}/><div style={{position:"absolute",textAlign:"center",transform:"translateY(-8px)"}}><div style={{fontSize:36,fontWeight:800,color:sOk?"#14b8a6":"#f59e0b",lineHeight:1}}>{tot.toFixed(1)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{minS>0?"из "+minS+" ("+(g==="M"?"М":"Ж")+")":"нет порога"}</div></div></div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginTop:16}}>
+      <div style={{display:"grid",gridTemplateColumns:(penaltyScore>0||penalties.dq)?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:12,marginTop:16}}>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{raw.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Элементы</div></div>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:b>0?"#14b8a6":"#64748b"}}>+{b.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Баланс</div></div>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{all.length}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Кол-во</div></div>
+        {(penaltyScore>0||penalties.dq)&&<div style={{textAlign:"center",padding:"10px 0",background:"rgba(239,68,68,0.1)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#ef4444"}}>{penalties.dq?"ДСК":"−"+penaltyScore}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Штрафы</div></div>}
       </div>
       <div style={{marginTop:16}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}><span style={{color:"#14b8a6"}}>Статика: {sC}</span><span style={{color:"#64748b"}}>Баланс</span><span style={{color:"#f59e0b"}}>Динамика: {dC}</span></div><div style={{height:6,background:"#0f172a",borderRadius:3,display:"flex",overflow:"hidden"}}>{(sC+dC)>0&&<><div style={{width:`${sC/(sC+dC)*100}%`,background:"#14b8a6",borderRadius:3,transition:"width 0.5s"}}/><div style={{width:`${dC/(sC+dC)*100}%`,background:"#f59e0b",borderRadius:3,transition:"width 0.5s"}}/></>}</div></div>
     </div>
 
-    <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>{[[sOk,`Баллы ${sOk?">=":"<"} ${minS}`,minS>0],[divOk,`Группы: ${fs}/3+`,true],[eOk,`Элементов: ${all.length}/${lv.minEl}+`,lv.minEl>0]].filter(x=>x[2]).map(([ok,t],i)=>(<div key={i} style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:ok?"rgba(20,184,166,0.12)":"rgba(239,68,68,0.12)",color:ok?"#14b8a6":"#ef4444",border:`1px solid ${ok?"rgba(20,184,166,0.3)":"rgba(239,68,68,0.3)"}`}}>{ok?"✓":"✗"} {t}</div>))}</div>
+    <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>{[[sOk,`Баллы ${sOk?">=":"<"} ${minS}`,minS>0],[comboOk,`Связка 3+ эл.: ${comboOk?"Да":"Нет"}`,true],[eOk,`Эл. ${lv.num} разр.: ${ownLevelCount}/${lv.minEl}+`,lv.minEl>0]].filter(x=>x[2]).map(([ok,t],i)=>(<div key={i} style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:ok?"rgba(20,184,166,0.12)":"rgba(239,68,68,0.12)",color:ok?"#14b8a6":"#ef4444",border:`1px solid ${ok?"rgba(20,184,166,0.3)":"rgba(239,68,68,0.3)"}`}}>{ok?"✓":"✗"} {t}</div>))}</div>
 
     <button onClick={()=>setShowR(!showR)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Нормативы: {lv.name}</span><span style={{transform:showR?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
     {showR&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>{reqs.map(r=>(<div key={r.l} style={{padding:"12px",background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{r.l}</div><div style={{fontSize:20,fontWeight:700,color:"#14b8a6",marginTop:2}}>{r.v}</div></div>))}</div>}
 
     <button onClick={()=>setShowV(!showV)} style={{width:"100%",padding:"14px",borderRadius:12,border:`1px solid ${showV?"rgba(20,184,166,0.3)":"#334155"}`,cursor:"pointer",fontSize:14,fontWeight:600,marginBottom:16,background:showV?"linear-gradient(135deg,rgba(20,184,166,0.2),rgba(20,184,166,0.05))":"linear-gradient(135deg,#1e293b,#0f172a)",color:showV?"#14b8a6":"#94a3b8",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{fontSize:18}}>🎙️</span>{showV?"Скрыть голосовой ввод":"Голосовой ввод связок"}</button>
 
-    {showV&&<><VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots}/><SynPanel syn={syn} onRem={remSyn}/></>}
+    {showV&&<VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots}/>}
 
+    <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} elements={ELS}/>
     <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Ручной выбор элементов (4 группы)</div>
-    {slots.map((slot,i)=>(<Pick key={i} label={SN[i]} color={SC[i]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)}/>))}
+    {slots.map((slot,i)=>(<Pick key={i} label={SN[i]} color={SC[i]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)} onMove={(from,to)=>move(i,from,to)} synonyms={syn}/>))}
+
+    <div style={{marginTop:16,marginBottom:8,padding:16,background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:16,border:"1px solid #334155"}}>
+      <div style={{fontSize:12,color:"#ef4444",marginBottom:12,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Штрафы</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div><div style={{fontSize:13,color:"#e2e8f0",fontWeight:500}}>Грязное выполнение</div><div style={{fontSize:11,color:"#64748b"}}>-2 балла</div></div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={()=>setPenalties(p=>({...p,dirty:Math.max(0,p.dirty-1)}))} style={{width:28,height:28,borderRadius:8,border:"1px solid #334155",background:"#0f172a",color:"#94a3b8",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+          <span style={{fontSize:16,fontWeight:700,color:penalties.dirty>0?"#ef4444":"#64748b",minWidth:20,textAlign:"center"}}>{penalties.dirty}</span>
+          <button onClick={()=>setPenalties(p=>({...p,dirty:p.dirty+1}))} style={{width:28,height:28,borderRadius:8,border:"1px solid #334155",background:"#0f172a",color:"#94a3b8",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div><div style={{fontSize:13,color:"#e2e8f0",fontWeight:500}}>Падение</div><div style={{fontSize:11,color:"#64748b"}}>-4 балла</div></div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={()=>setPenalties(p=>({...p,fall:Math.max(0,p.fall-1)}))} style={{width:28,height:28,borderRadius:8,border:"1px solid #334155",background:"#0f172a",color:"#94a3b8",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+          <span style={{fontSize:16,fontWeight:700,color:penalties.fall>0?"#ef4444":"#64748b",minWidth:20,textAlign:"center"}}>{penalties.fall}</span>
+          <button onClick={()=>setPenalties(p=>({...p,fall:p.fall+1}))} style={{width:28,height:28,borderRadius:8,border:"1px solid #334155",background:"#0f172a",color:"#94a3b8",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid #334155"}}>
+        <div><div style={{fontSize:13,color:"#e2e8f0",fontWeight:500}}>Жёсткое падение</div><div style={{fontSize:11,color:"#64748b"}}>Дисквалификация</div></div>
+        <button onClick={()=>setPenalties(p=>({...p,dq:!p.dq}))} style={{padding:"6px 16px",borderRadius:8,border:`1px solid ${penalties.dq?"rgba(239,68,68,0.5)":"#334155"}`,background:penalties.dq?"rgba(239,68,68,0.2)":"#0f172a",color:penalties.dq?"#ef4444":"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>{penalties.dq?"ДСК":"Нет"}</button>
+      </div>
+      {(penaltyScore>0||penalties.dq)&&<div style={{marginTop:10,padding:"8px 12px",background:"rgba(239,68,68,0.08)",borderRadius:8,border:"1px solid rgba(239,68,68,0.2)",fontSize:12,color:"#ef4444",fontWeight:600}}>
+        {penalties.dq?"ДИСКВАЛИФИКАЦИЯ":"Штраф: −"+penaltyScore+" б."}
+      </div>}
+    </div>
 
     {all.length>0&&(<div style={{marginTop:24,padding:20,borderRadius:16,textAlign:"center",background:allOk?"linear-gradient(135deg,rgba(20,184,166,0.15),rgba(20,184,166,0.05))":"linear-gradient(135deg,rgba(239,68,68,0.1),rgba(239,68,68,0.03))",border:`1px solid ${allOk?"rgba(20,184,166,0.3)":"rgba(239,68,68,0.2)"}`}}><div style={{fontSize:18,fontWeight:700,color:allOk?"#14b8a6":"#f59e0b"}}>{allOk?"Уровень выполнен!":"Не хватает требований"}</div><div style={{fontSize:12,color:"#64748b",marginTop:4}}>{lv.name} — Итого: {tot.toFixed(1)} баллов</div>
       <button onClick={()=>{
@@ -512,7 +567,10 @@ function App(){
         txt+="\n═══════════════════════════\n";
         txt+="Элементы: "+raw.toFixed(1)+" | Баланс: +"+b.toFixed(1)+" | ИТОГО: "+tot.toFixed(1)+"\n";
         txt+="Статика: "+sC+" | Динамика: "+dC+"\n";
-        txt+="Результат: "+(allOk?"ВЫПОЛНЕН":"НЕ ВЫПОЛНЕН")+"\n";
+        if(penaltyScore>0)txt+="Штрафы: −"+penaltyScore+" б. (грязное: "+penalties.dirty+", падение: "+penalties.fall+")\n";
+        if(penalties.dq)txt+="ДИСКВАЛИФИКАЦИЯ (жёсткое падение)\n";
+        txt+="Эл. "+lv.num+" разряда: "+ownLevelCount+"/"+lv.minEl+"\n";
+        txt+="Результат: "+(penalties.dq?"ДИСКВАЛИФИКАЦИЯ":(allOk?"ВЫПОЛНЕН":"НЕ ВЫПОЛНЕН"))+"\n";
         if(navigator.share){navigator.share({title:"Протокол WU",text:txt}).catch(()=>{});}
         else{navigator.clipboard.writeText(txt).then(()=>alert("Скопировано!")).catch(()=>{const w=window.open();w.document.write("<pre>"+txt+"</pre>");});}
       }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",background:"rgba(20,184,166,0.1)",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer"}}>📋 Протокол</button>
