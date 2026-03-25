@@ -70,23 +70,26 @@ function Gauge({value,max,color}){const p=max>0?Math.min(value/max,1):0;const C=
 /* ── Voice Search Hook ── */
 function useVoiceSearch(){
   const[listening,setListening]=useState(false);
-  const recRef=useRef(null);const cbRef=useRef(null);
-  const SR=typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition);
-  const available=!!SR;
+  const mrRef=useRef(null);const chRef=useRef([]);const cbRef=useRef(null);
+  const available=!!navigator.mediaDevices;
   const start=useCallback((onResult)=>{
-    if(!SR)return;cbRef.current=onResult;
-    const r=new SR();r.lang="ru-RU";r.continuous=false;r.interimResults=true;r.maxAlternatives=3;
-    r.onresult=e=>{
-      let f="",im="";
-      for(let i=0;i<e.results.length;i++){if(e.results[i].isFinal)f+=e.results[i][0].transcript+" ";else im+=e.results[i][0].transcript;}
-      if(cbRef.current)cbRef.current(f.trim()||im.trim());
-    };
-    r.onend=()=>{setListening(false);recRef.current=null;};
-    r.onerror=()=>{setListening(false);recRef.current=null;};
-    recRef.current=r;
-    try{r.start();setListening(true);}catch(e){setListening(false);}
-  },[SR]);
-  const stop=useCallback(()=>{if(recRef.current)try{recRef.current.stop();}catch(e){}setListening(false);},[]);
+    if(!navigator.mediaDevices)return;cbRef.current=onResult;
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+      const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
+      chRef.current=[];
+      mr.ondataavailable=e=>{if(e.data.size>0)chRef.current.push(e.data);};
+      mr.onstop=async()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        const blob=new Blob(chRef.current,{type:mr.mimeType});
+        if(blob.size<100){setListening(false);return;}
+        try{const text=await whisperTranscribe(blob);if(cbRef.current&&text.trim())cbRef.current(text.trim());}
+        catch(e){}
+        setListening(false);mrRef.current=null;
+      };
+      mrRef.current=mr;mr.start();setListening(true);
+    }).catch(()=>{setListening(false);});
+  },[]);
+  const stop=useCallback(()=>{if(mrRef.current&&mrRef.current.state==="recording")try{mrRef.current.stop();}catch(e){}else setListening(false);},[]);
   return{available,listening,start,stop};
 }
 
@@ -183,131 +186,66 @@ async function aiParse(transcript){
   return resp.json();
 }
 
+async function whisperTranscribe(audioBlob){
+  const cfg=LS.get("wu-ai")||{};
+  if(!cfg.url||!cfg.key)throw new Error("Настройте AI сервер в настройках");
+  const fd=new FormData();
+  fd.append("audio",audioBlob,"audio.webm");
+  fd.append("api_key",cfg.key);
+  const resp=await fetch(cfg.url+"/api/ai/transcribe",{method:"POST",body:fd});
+  if(!resp.ok)throw new Error("Whisper: "+resp.status);
+  const data=await resp.json();
+  return data.text||"";
+}
+
 /* ── Voice Panel ── */
 function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const[on,setOn]=useState(false);const[tx,setTx]=useState("");const[itx,setItx]=useState("");
   const[parsed,setParsed]=useState(null);const[uri,setUri]=useState(null);const[sq,setSq]=useState("");
   const[ti,setTi]=useState("");const[status,setStatus]=useState("");
   const[aiLoading,setAiLoading]=useState(false);
-  const[micOk,setMicOk]=useState(null); // null=unknown, true=ok, false=denied
-  const[srOk,setSrOk]=useState(null);
-  const rec=useRef(null);const imRef=useRef("");const wantOn=useRef(false);
+  const[micOk,setMicOk]=useState(null);
+  const mediaRec=useRef(null);const chunks=useRef([]);
   const sidx=useMemo(()=>buildIdx(ELS,synonyms),[synonyms]);
 
-  // Check Speech Recognition API exists
-  useEffect(()=>{
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    setSrOk(!!SR);
-    if(!SR) setStatus("Speech API не найден в этом браузере");
-  },[]);
-
-  // Request mic permission explicitly
   const requestMic=async()=>{
     try{
       setStatus("Запрашиваю микрофон...");
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      // Got permission, stop the stream (we just needed the permission)
       stream.getTracks().forEach(t=>t.stop());
-      setMicOk(true);
-      setStatus("Микрофон разрешён ✓");
-      return true;
+      setMicOk(true);setStatus("Микрофон разрешён");return true;
     }catch(e){
       setMicOk(false);
-      if(e.name==="NotAllowedError") setStatus("⛔ Микрофон заблокирован. Разрешите в настройках браузера");
-      else if(e.name==="NotFoundError") setStatus("⛔ Микрофон не найден на устройстве");
-      else setStatus("⛔ Ошибка микрофона: "+e.message);
+      if(e.name==="NotAllowedError")setStatus("Микрофон заблокирован");
+      else if(e.name==="NotFoundError")setStatus("Микрофон не найден");
+      else setStatus("Ошибка микрофона: "+e.message);
       return false;
     }
   };
 
-  const createRec=()=>{
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR)return null;
-    const r=new SR();
-    r.lang="ru-RU";
-    r.continuous=false; // More reliable on mobile!
-    r.interimResults=true;
-    r.maxAlternatives=3;
-    
-    r.onstart=()=>{setStatus("🎤 Слушаю...");};
-    
-    r.onresult=e=>{
-      let f="",im="";
-      for(let i=0;i<e.results.length;i++){
-        if(e.results[i].isFinal) f+=e.results[i][0].transcript+" ";
-        else im+=e.results[i][0].transcript;
-      }
-      if(f.trim()){
-        setTx(prev=>(prev?prev+" ":"")+f.trim());
-        setItx("");
-        imRef.current="";
-      } else {
-        setItx(im);
-        imRef.current=im;
-      }
-    };
-    
-    r.onerror=e=>{
-      if(e.error==="no-speech"){
-        setStatus("Тишина... попробуйте снова");
-      } else if(e.error==="not-allowed"){
-        setStatus("⛔ Микрофон заблокирован");
-        setMicOk(false);
-        wantOn.current=false;
-        setOn(false);
-      } else {
-        setStatus("Ошибка: "+e.error);
-      }
-    };
-    
-    r.onend=()=>{
-      // Capture remaining interim
-      if(imRef.current){
-        setTx(prev=>(prev?prev+" ":"")+imRef.current);
-        setItx("");imRef.current="";
-      }
-      // Auto-restart if we still want to listen (non-continuous mode ends after each phrase)
-      if(wantOn.current){
-        try{
-          setTimeout(()=>{
-            if(wantOn.current&&rec.current){
-              rec.current.start();
-              setStatus("🎤 Слушаю...");
-            }
-          },200);
-        }catch(e){setStatus("Ошибка перезапуска");setOn(false);wantOn.current=false;}
-      } else {
-        setOn(false);
-        setStatus(prev=>prev.startsWith("⛔")?prev:"Запись остановлена");
-      }
-    };
-    return r;
-  };
-
   const start=async()=>{
-    // First check mic permission
-    if(micOk!==true){
-      const ok=await requestMic();
-      if(!ok)return;
-    }
-    // Create fresh recognition instance each time
-    rec.current=createRec();
-    if(!rec.current){setStatus("Speech API не поддерживается");return;}
-    setTx("");setItx("");setParsed(null);setUri(null);setTi("");imRef.current="";
-    wantOn.current=true;
+    if(micOk!==true){const ok=await requestMic();if(!ok)return;}
     try{
-      rec.current.start();
-      setOn(true);
-    }catch(e){
-      setStatus("Ошибка запуска: "+e.message);
-      wantOn.current=false;
-    }
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
+      chunks.current=[];
+      mr.ondataavailable=e=>{if(e.data.size>0)chunks.current.push(e.data);};
+      mr.onstop=async()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        const blob=new Blob(chunks.current,{type:mr.mimeType});
+        if(blob.size<100){setStatus("Запись слишком короткая");setOn(false);return;}
+        setStatus("🤖 Распознаю речь (Whisper)...");
+        try{const text=await whisperTranscribe(blob);if(text.trim()){setTx(prev=>(prev?prev+" ":"")+text.trim());setStatus("Распознано ✓");}else{setStatus("Речь не распознана");}}
+        catch(e){setStatus("⛔ "+e.message);}
+        setOn(false);
+      };
+      mediaRec.current=mr;mr.start();setOn(true);setStatus("🎤 Запись...");setItx("");
+    }catch(e){setStatus("Ошибка записи: "+e.message);setOn(false);}
   };
 
   const stop=()=>{
-    wantOn.current=false;
-    if(rec.current){try{rec.current.stop();}catch(e){}}
-    setOn(false);
+    if(mediaRec.current&&mediaRec.current.state==="recording"){try{mediaRec.current.stop();}catch(e){}}
+    else setOn(false);
   };
 
   const process=useCallback(()=>{
@@ -386,7 +324,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     finally{setAiLoading(false);}
   };
 
-  const voiceAvail=srOk===true;
+  const voiceAvail=!!navigator.mediaDevices;
 
   return(<div style={{marginBottom:20,background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:16,border:"1px solid #334155",overflow:"hidden"}}>
     <div style={{padding:"16px 20px",borderBottom:"1px solid #1e293b",display:"flex",alignItems:"center",gap:12}}>
