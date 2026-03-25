@@ -178,14 +178,26 @@ function smartSplit(raw,idx){
 
 /* ── AI Parse helper ── */
 const AI_NAMES=ELS.map(e=>e.name);
-async function aiParse(transcript,synonyms){
+async function aiParse(transcript){
   const cfg=LS.get("wu-ai")||{};
   if(!cfg.url||!cfg.key)throw new Error("Настройте AI сервер в настройках (⚙️)");
-  const body={transcript,api_key:cfg.key,include_slots:true};
-  if(synonyms&&Object.keys(synonyms).length>0)body.synonyms=synonyms;
-  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const resp=await fetch(cfg.url+"/api/ai/parse",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript,api_key:cfg.key,include_slots:true})});
   if(!resp.ok)throw new Error("AI сервер: "+resp.status);
   return resp.json();
+}
+
+/* ── Synonym sync with server ── */
+async function syncSynonymsToServer(syn){
+  const cfg=LS.get("wu-ai")||{};if(!cfg.url||!cfg.key)return;
+  try{await fetch(cfg.url+"/api/ai/synonyms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({api_key:cfg.key,synonyms:syn})});}catch(e){console.warn("Syn sync failed:",e);}
+}
+async function fetchSynonymsFromServer(){
+  const cfg=LS.get("wu-ai")||{};if(!cfg.url||!cfg.key)return null;
+  try{const r=await fetch(cfg.url+"/api/ai/synonyms?api_key="+encodeURIComponent(cfg.key));if(!r.ok)return null;const d=await r.json();return d.synonyms||null;}catch(e){return null;}
+}
+async function deleteSynonymOnServer(key){
+  const cfg=LS.get("wu-ai")||{};if(!cfg.url||!cfg.key)return;
+  try{await fetch(cfg.url+"/api/ai/synonyms?api_key="+encodeURIComponent(cfg.key)+"&key="+encodeURIComponent(key),{method:"DELETE"});}catch(e){}
 }
 
 async function whisperTranscribe(audioBlob){
@@ -301,7 +313,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     const src=text||(tx||ti).trim();if(!src){setStatus("Нет текста");return;}
     setAiLoading(true);setStatus("🤖 AI анализирует...");
     try{
-      const data=await aiParse(src,synonyms);
+      const data=await aiParse(src);
       if(data.elements&&data.elements.length){
         const voiceChunks=parseVoice(src);
         const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
@@ -410,7 +422,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 }
 
 /* ── Synonym Panel ── */
-function SynPanel({syn,onRem,onAdd,onReplace,elements}){
+function SynPanel({syn,onRem,onAdd,onReplace,elements,syncStatus}){
   const[show,setShow]=useState(false);
   const[filter,setFilter]=useState("");
   const[newKey,setNewKey]=useState("");
@@ -427,6 +439,8 @@ function SynPanel({syn,onRem,onAdd,onReplace,elements}){
         <button onClick={()=>{const blob=new Blob([JSON.stringify(syn,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wu-synonyms.json";a.click();URL.revokeObjectURL(a.href);}} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer"}}>📥 Экспорт</button>
         <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=re=>{try{const d=JSON.parse(re.target.result);if(typeof d==="object"&&!Array.isArray(d)){onReplace({...syn,...d});}}catch(e){}};r.readAsText(f);};inp.click();}} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer"}}>📤 Импорт</button>
       </div>
+      {syncStatus&&<div style={{fontSize:11,color:"#14b8a6",marginBottom:8,textAlign:"center"}}>{syncStatus}</div>}
+      <div style={{fontSize:10,color:"#475569",marginBottom:10,textAlign:"center"}}>Синонимы хранятся на сервере и синхронизируются автоматически</div>
       {addMode&&(<div style={{padding:12,background:"#0f172a",borderRadius:10,border:"1px solid rgba(20,184,166,0.2)",marginBottom:12}}>
         <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Слово/фраза (как говорите)</label><input value={newKey} onChange={e=>setNewKey(e.target.value)} placeholder='напр: "выход 1рука"' style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
         <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Элемент (что имеете в виду)</label><input value={newVal} onChange={e=>setNewVal(e.target.value)} placeholder="Поиск элемента..." style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
@@ -462,10 +476,26 @@ function App(){
   const[penalties,setPenalties]=useState({dirty:0,fall:0,dq:false});
   const addPenalty=useCallback((type)=>{if(type==="dq")setPenalties(p=>({...p,dq:true}));else setPenalties(p=>({...p,[type]:p[type]+1}));},[]);
   const[syn,setSyn]=useState(()=>LS.get("wu-syn")||{});
+  const[synStatus,setSynStatus]=useState("");
 
-  const saveSyn=useCallback(ns=>{setSyn(ns);LS.set("wu-syn",ns);},[]);
-  const addSyn=useCallback((k,v)=>saveSyn({...syn,[norm(k)]:v}),[syn,saveSyn]);
-  const remSyn=useCallback(k=>{const ns={...syn};delete ns[k];saveSyn(ns);},[syn,saveSyn]);
+  const saveSyn=useCallback(ns=>{setSyn(ns);LS.set("wu-syn",ns);syncSynonymsToServer(ns);},[]);
+  const addSyn=useCallback((k,v)=>{const ns={...syn,[norm(k)]:v};setSyn(ns);LS.set("wu-syn",ns);syncSynonymsToServer(ns);},[syn]);
+  const remSyn=useCallback(k=>{const ns={...syn};delete ns[k];setSyn(ns);LS.set("wu-syn",ns);deleteSynonymOnServer(k);},[syn]);
+
+  /* Sync synonyms from server on mount */
+  useEffect(()=>{
+    fetchSynonymsFromServer().then(serverSyn=>{
+      if(!serverSyn)return;
+      const local=LS.get("wu-syn")||{};
+      const merged={...serverSyn,...local};
+      if(JSON.stringify(merged)!==JSON.stringify(local)){
+        setSyn(merged);LS.set("wu-syn",merged);
+        syncSynonymsToServer(merged);
+        setSynStatus("Синхронизировано с сервером");
+        setTimeout(()=>setSynStatus(""),3000);
+      }
+    });
+  },[]);
 
   const lv=LEVELS[li];const minS=g==="M"?lv.minM:lv.minF;
   const all=useMemo(()=>slots.flat(),[slots]);
@@ -515,7 +545,7 @@ function App(){
 
     {showV&&<VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots} onPenalty={addPenalty}/>}
 
-    <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} onReplace={saveSyn} elements={ELS}/>
+    <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} onReplace={saveSyn} elements={ELS} syncStatus={synStatus}/>
     <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Связки ({slots.length})</div>
     {slots.map((slot,i)=>(<div key={i} style={{position:"relative"}}>{slots.length>1&&<button onClick={()=>removeSlot(i)} style={{position:"absolute",top:0,right:0,width:24,height:24,borderRadius:6,border:"1px solid #334155",background:"#1e293b",color:"#64748b",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}} title="Удалить связку">×</button>}<Pick label={SN[i]||("Связка "+(i+1))} color={SC[i%SC.length]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)} onMove={(from,to)=>move(i,from,to)} synonyms={syn}/></div>))}
     {slots.length<10&&<button onClick={addSlot} style={{width:"100%",padding:"12px",borderRadius:12,border:"1px dashed rgba(20,184,166,0.3)",background:"transparent",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:16}}>+ Добавить связку</button>}
