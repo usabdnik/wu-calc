@@ -408,7 +408,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 }
 
 /* ── Synonym Panel ── */
-function SynPanel({syn,onRem,onAdd,elements}){
+function SynPanel({syn,onRem,onAdd,onReplace,elements}){
   const[show,setShow]=useState(false);
   const[filter,setFilter]=useState("");
   const[newKey,setNewKey]=useState("");
@@ -420,7 +420,11 @@ function SynPanel({syn,onRem,onAdd,elements}){
   return(<div style={{marginBottom:20}}>
     <button onClick={()=>setShow(!show)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>Словарь синонимов ({e.length})</span><span style={{transform:show?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
     {show&&(<div style={{marginTop:8,padding:16,background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}>
-      <button onClick={()=>setAddMode(!addMode)} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px dashed rgba(20,184,166,0.3)",background:addMode?"rgba(20,184,166,0.1)":"transparent",color:"#14b8a6",fontSize:12,fontWeight:600,cursor:"pointer",marginBottom:12}}>{addMode?"Отмена":"+ Добавить синоним"}</button>
+      <div style={{display:"flex",gap:6,marginBottom:12}}>
+        <button onClick={()=>setAddMode(!addMode)} style={{flex:1,padding:"8px",borderRadius:8,border:"1px dashed rgba(20,184,166,0.3)",background:addMode?"rgba(20,184,166,0.1)":"transparent",color:"#14b8a6",fontSize:12,fontWeight:600,cursor:"pointer"}}>{addMode?"Отмена":"+ Добавить"}</button>
+        <button onClick={()=>{const blob=new Blob([JSON.stringify(syn,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wu-synonyms.json";a.click();URL.revokeObjectURL(a.href);}} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer"}}>📥 Экспорт</button>
+        <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=re=>{try{const d=JSON.parse(re.target.result);if(typeof d==="object"&&!Array.isArray(d)){onReplace({...syn,...d});}}catch(e){}};r.readAsText(f);};inp.click();}} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer"}}>📤 Импорт</button>
+      </div>
       {addMode&&(<div style={{padding:12,background:"#0f172a",borderRadius:10,border:"1px solid rgba(20,184,166,0.2)",marginBottom:12}}>
         <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Слово/фраза (как говорите)</label><input value={newKey} onChange={e=>setNewKey(e.target.value)} placeholder='напр: "выход 1рука"' style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
         <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Элемент (что имеете в виду)</label><input value={newVal} onChange={e=>setNewVal(e.target.value)} placeholder="Поиск элемента..." style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>
@@ -509,7 +513,7 @@ function App(){
 
     {showV&&<VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots} onPenalty={addPenalty}/>}
 
-    <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} elements={ELS}/>
+    <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} onReplace={saveSyn} elements={ELS}/>
     <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Связки ({slots.length})</div>
     {slots.map((slot,i)=>(<div key={i} style={{position:"relative"}}>{slots.length>1&&<button onClick={()=>removeSlot(i)} style={{position:"absolute",top:0,right:0,width:24,height:24,borderRadius:6,border:"1px solid #334155",background:"#1e293b",color:"#64748b",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}} title="Удалить связку">×</button>}<Pick label={SN[i]||("Связка "+(i+1))} color={SC[i%SC.length]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)} onMove={(from,to)=>move(i,from,to)} synonyms={syn}/></div>))}
     {slots.length<10&&<button onClick={addSlot} style={{width:"100%",padding:"12px",borderRadius:12,border:"1px dashed rgba(20,184,166,0.3)",background:"transparent",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:16}}>+ Добавить связку</button>}
