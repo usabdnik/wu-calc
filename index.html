@@ -184,7 +184,7 @@ async function aiParse(transcript){
 }
 
 /* ── Voice Panel ── */
-function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
+function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const[on,setOn]=useState(false);const[tx,setTx]=useState("");const[itx,setItx]=useState("");
   const[parsed,setParsed]=useState(null);const[uri,setUri]=useState(null);const[sq,setSq]=useState("");
   const[ti,setTi]=useState("");const[status,setStatus]=useState("");
@@ -312,10 +312,15 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
 
   const process=useCallback(()=>{
     if(!tx.trim())return;
+    const lo=norm(tx);
+    if(onPenalty){
+      const penKw=[{p:["жесткое падение","жёсткое падение","дисквалификация"],t:"dq"},{p:["падение","упал","упала"],t:"fall"},{p:["грязно","бланш","грязное","штраф минус 2","минус 2 балла","минус два"],t:"dirty"}];
+      for(const{p,t}of penKw)for(const kw of p)if(lo.includes(kw)){onPenalty(t);setStatus("⚠️ Штраф: "+(t==="dq"?"ДСК":t==="fall"?"падение":"грязное"));break;}
+    }
     const chunks=parseVoice(tx);
     const res=chunks.map(({sl,raw})=>{const qs=smartSplit(raw,sidx);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});
     setParsed(res);
-  },[tx,sidx]);
+  },[tx,sidx,onPenalty]);
 
   const unr=useMemo(()=>{if(!parsed)return[];const it=[];parsed.forEach((c,ci)=>c.ms.forEach((m,mi)=>{if(!m.el)it.push({ci,mi,q:m.q});}));return it;},[parsed]);
   const au=uri!==null?unr[uri]:null;
@@ -323,6 +328,8 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
   const editEls=useMemo(()=>editSq?ELS.filter(e=>norm(e.name).includes(norm(editSq))).slice(0,30):ELS.slice(0,30),[editSq]);
   const startEdit=(ci,mi,q)=>{setEditCI(ci);setEditMI(mi);setEditSq(q);setUri(null);setSq("");};
   const applyEdit=(el)=>{
+    const origQ=parsed[editCI]?.ms[editMI]?.q;
+    if(origQ&&!parsed[editCI].ms[editMI].el){onAddSyn(origQ,el.name);}
     setParsed(parsed.map((c,i)=>i!==editCI?c:{...c,ms:c.ms.map((m,j)=>j!==editMI?m:{...m,el,m:{el,s:1,ex:true}})}));
     setEditCI(null);setEditMI(null);setEditSq("");
   };
@@ -348,7 +355,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
 
   const fEls=useMemo(()=>sq?ELS.filter(e=>norm(e.name).includes(norm(sq))).slice(0,30):ELS.slice(0,30),[sq]);
 
-  const processText=()=>{if(!ti.trim())return;setTx(ti);const chunks=parseVoice(ti);const res=chunks.map(({sl,raw})=>{const qs=smartSplit(raw,sidx);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});setParsed(res);};
+  const processText=()=>{if(!ti.trim())return;setTx(ti);const lo=norm(ti);if(onPenalty){const penKw=[{p:["жесткое падение","жёсткое падение","дисквалификация"],t:"dq"},{p:["падение","упал","упала"],t:"fall"},{p:["грязно","бланш","грязное","штраф минус 2","минус 2 балла","минус два"],t:"dirty"}];for(const{p,t}of penKw)for(const kw of p)if(lo.includes(kw)){onPenalty(t);break;}}const chunks=parseVoice(ti);const res=chunks.map(({sl,raw})=>{const qs=smartSplit(raw,sidx);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});setParsed(res);};
 
   const processAI=async(text)=>{
     const src=text||(tx||ti).trim();if(!src){setStatus("Нет текста");return;}
@@ -356,12 +363,23 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
     try{
       const data=await aiParse(src);
       if(data.elements&&data.elements.length){
-        /* Convert AI response to parsed format: group into slot 0 by default */
-        const ms=data.elements.map(ai=>{
-          const el=ELS.find(e=>e.name===ai.name);
-          return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};
-        });
-        setParsed([{sl:0,ms}]);
+        const voiceChunks=parseVoice(src);
+        if(voiceChunks.length>1||voiceChunks[0].sl!==0||voiceChunks.length===1&&voiceChunks[0].raw!==src.trim()){
+          /* Distribute AI elements across voice-detected slots */
+          const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
+          let idx=0;const res=[];
+          for(const vc of voiceChunks){
+            const wordCount=vc.raw.split(/[\s,]+/).filter(Boolean).length;
+            const chunk={sl:vc.sl,ms:aiEls.slice(idx,idx+wordCount)};
+            if(chunk.ms.length)res.push(chunk);
+            idx+=wordCount;
+          }
+          if(idx<aiEls.length)res.push({sl:voiceChunks.length>0?voiceChunks[voiceChunks.length-1].sl:0,ms:aiEls.slice(idx)});
+          setParsed(res.filter(r=>r.ms.length>0));
+        }else{
+          const ms=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
+          setParsed([{sl:0,ms}]);
+        }
         setStatus("🤖 AI нашёл "+data.elements.length+" элементов");
       }else{setStatus("AI не нашёл элементов");}
     }catch(e){setStatus("⛔ "+e.message);}
@@ -401,7 +419,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
     </div>)}
 
     {parsed&&(<div style={{padding:"12px 20px 20px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontSize:11,color:"#64748b",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Найденные элементы:</span><button onClick={()=>{setParsed(null);setEditCI(null);setEditMI(null);}} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:11,cursor:"pointer"}}>✏️ Редактировать текст</button></div>
-      {parsed.map((ch,ci)=>(<div key={ci} style={{marginBottom:12}}><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}><div style={{width:8,height:8,borderRadius:2,background:SC[ch.sl]}}/><span style={{fontSize:12,fontWeight:600,color:SC[ch.sl]}}>{SN[ch.sl]}</span></div>
+      {parsed.map((ch,ci)=>(<div key={ci} style={{marginBottom:12}}><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}><div style={{width:8,height:8,borderRadius:2,background:SC[ch.sl%SC.length]}}/><select value={ch.sl} onChange={e=>{const ns=parseInt(e.target.value);setParsed(parsed.map((c,i)=>i===ci?{...c,sl:ns}:c));}} style={{fontSize:12,fontWeight:600,color:SC[ch.sl%SC.length],background:"transparent",border:"1px solid #334155",borderRadius:6,padding:"2px 6px",cursor:"pointer",outline:"none"}}>{SN.map((n,si)=>(<option key={si} value={si} style={{background:"#1e293b",color:"#e2e8f0"}}>{n}</option>))}</select></div>
         <div style={{display:"flex",flexDirection:"column",gap:2}}>{ch.ms.map((m,mi)=>(<React.Fragment key={mi}>
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:m.el?"rgba(20,184,166,0.06)":"rgba(239,68,68,0.06)",border:`1px solid ${m.el?"rgba(20,184,166,0.2)":"rgba(239,68,68,0.2)"}`,borderRadius:10}}><span style={{fontSize:12,color:"#64748b",flex:"0 0 auto"}}>"{m.q}"</span><span style={{fontSize:14,color:"#475569"}}>→</span>
           {m.el?(<div style={{flex:1,display:"flex",alignItems:"center",gap:6,minWidth:0}}>
@@ -409,7 +427,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
             <span style={{fontSize:11,fontWeight:700,color:"#f59e0b",flexShrink:0}}>{m.el.score}</span>
             {m.m&&!m.m.ex&&<span style={{fontSize:10,color:"#64748b",flexShrink:0}}>~{Math.round(m.m.s*100)}%</span>}
             <span onClick={()=>removeEl(ci,mi)} style={{cursor:"pointer",color:"#64748b",fontSize:14,lineHeight:1,marginLeft:"auto",flexShrink:0}}>×</span>
-          </div>):(<button onClick={()=>{const i=unr.findIndex(u=>u.ci===ci&&u.mi===mi);setUri(i>=0?i:null);setSq(m.q);}} style={{flex:1,padding:"4px 10px",borderRadius:8,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.1)",color:"#ef4444",fontSize:12,cursor:"pointer",textAlign:"left"}}>❌ Не найден — выбрать</button>)}
+          </div>):(<div style={{flex:1,display:"flex",alignItems:"center",gap:6}}><button onClick={()=>{const i=unr.findIndex(u=>u.ci===ci&&u.mi===mi);setUri(i>=0?i:null);setSq(m.q);}} style={{flex:1,padding:"4px 10px",borderRadius:8,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.1)",color:"#ef4444",fontSize:12,cursor:"pointer",textAlign:"left"}}>❌ Выбрать элемент</button><button onClick={()=>startEdit(ci,mi,m.q)} style={{padding:"4px 8px",borderRadius:8,border:"1px solid rgba(168,85,247,0.3)",background:"rgba(168,85,247,0.1)",color:"#a855f7",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>🔍 Найти</button></div>)}
           </div>
           {mi<ch.ms.length-1&&(<div style={{display:"flex",justifyContent:"center"}}><button onClick={()=>mergeEls(ci,mi)} style={{padding:"2px 12px",borderRadius:6,border:"1px dashed #334155",background:"transparent",color:"#64748b",fontSize:10,cursor:"pointer",lineHeight:1.2}} title="Объединить с нижним">⊕ склеить</button></div>)}
         </React.Fragment>))}</div></div>))}
@@ -421,7 +439,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
         <button onClick={()=>{setUri(null);setSq("");}} style={{marginTop:8,padding:"6px 14px",borderRadius:8,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Пропустить</button>
       </div>)}
 
-      {editCI!==null&&(<div style={{marginTop:12,padding:16,background:"#0f172a",borderRadius:12,border:"1px solid #14b8a6"}}><div style={{fontSize:13,fontWeight:600,color:"#14b8a6",marginBottom:8}}>Заменить элемент:</div>
+      {editCI!==null&&(<div style={{marginTop:12,padding:16,background:"#0f172a",borderRadius:12,border:"1px solid #14b8a6"}}><div style={{fontSize:13,fontWeight:600,color:"#14b8a6",marginBottom:4}}>{parsed[editCI]?.ms[editMI]?.el?"Заменить элемент:":"Выбрать элемент:"}</div>{!parsed[editCI]?.ms[editMI]?.el&&<div style={{fontSize:11,color:"#a855f7",marginBottom:8}}>💡 Синоним "{parsed[editCI]?.ms[editMI]?.q}" сохранится автоматически</div>}
         <input value={editSq} onChange={e=>setEditSq(e.target.value)} placeholder="Поиск в базе..." style={{width:"100%",padding:"8px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
         <div style={{maxHeight:200,overflowY:"auto"}}>{editEls.map(el=>(<div key={el.name} onClick={()=>applyEdit(el)} style={{padding:"6px 10px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1e293b",fontSize:12,color:"#cbd5e1"}} onMouseEnter={e=>e.currentTarget.style.background="#334155"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{el.name}</span><span style={{marginLeft:8,display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,padding:"1px 5px",borderRadius:4,background:el.cat==="Статика"?"rgba(20,184,166,0.15)":"rgba(245,158,11,0.15)",color:el.cat==="Статика"?"#14b8a6":"#f59e0b"}}>{el.cat==="Статика"?"С":"Д"}</span><span style={{fontWeight:700,color:"#f59e0b"}}>{el.score}</span></span></div>))}</div>
         <button onClick={cancelEdit} style={{marginTop:8,padding:"6px 14px",borderRadius:8,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Отмена</button>
@@ -480,6 +498,7 @@ function App(){
   const[li,setLi]=useState(4);const[g,setG]=useState("M");const[slots,setSlots]=useState([[]]);
   const[showR,setShowR]=useState(false);const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);
   const[penalties,setPenalties]=useState({dirty:0,fall:0,dq:false});
+  const addPenalty=useCallback((type)=>{if(type==="dq")setPenalties(p=>({...p,dq:true}));else setPenalties(p=>({...p,[type]:p[type]+1}));},[]);
   const[syn,setSyn]=useState(()=>LS.get("wu-syn")||{});
 
   const saveSyn=useCallback(ns=>{setSyn(ns);LS.set("wu-syn",ns);},[]);
@@ -532,7 +551,7 @@ function App(){
 
     <button onClick={()=>setShowV(!showV)} style={{width:"100%",padding:"14px",borderRadius:12,border:`1px solid ${showV?"rgba(20,184,166,0.3)":"#334155"}`,cursor:"pointer",fontSize:14,fontWeight:600,marginBottom:16,background:showV?"linear-gradient(135deg,rgba(20,184,166,0.2),rgba(20,184,166,0.05))":"linear-gradient(135deg,#1e293b,#0f172a)",color:showV?"#14b8a6":"#94a3b8",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{fontSize:18}}>🎙️</span>{showV?"Скрыть голосовой ввод":"Голосовой ввод связок"}</button>
 
-    {showV&&<VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots}/>}
+    {showV&&<VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots} onPenalty={addPenalty}/>}
 
     <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} elements={ELS}/>
     <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Связки ({slots.length})</div>
