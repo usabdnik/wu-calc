@@ -45,8 +45,8 @@ const LEVELS=[
 {name:"FREESTYLE 9",num:9,otj:50,podt:20,br:40,pres:6,vyh:5,minEl:8,minM:111,minF:83.25},
 {name:"FREESTYLE 10",num:10,otj:50,podt:20,br:40,pres:6,vyh:5,minEl:4,minM:110,minF:82.5}];
 
-const SN=["Группа A","Группа C","Группа E","Группа G"];
-const SC=["#14b8a6","#f59e0b","#a78bfa","#f472b6"];
+const SN=["Связка 1","Связка 2","Связка 3","Связка 4","Связка 5","Связка 6","Связка 7","Связка 8","Связка 9","Связка 10"];
+const SC=["#14b8a6","#f59e0b","#a78bfa","#f472b6","#38bdf8","#fb923c","#4ade80","#e879f9","#fbbf24","#67e8f9"];
 
 /* ── Fuzzy ── */
 function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>i);for(let j=1;j<=n;j++){let p=d[0];d[0]=j;for(let i=1;i<=m;i++){const t=d[i];d[i]=a[i-1]===b[j-1]?p:1+Math.min(p,d[i],d[i-1]);p=t;}}return d[m];}
@@ -123,14 +123,20 @@ const SLOT_KW=[
 {ps:["группа а","группа a","связка 1","связка один","связка 1н","первая связка","первая группа","1 связка","1 группа","группа 1"],sl:0},
 {ps:["группа с","группа c","связка 2","связка два","связка 2а","вторая связка","вторая группа","2 связка","2 группа","группа 2"],sl:1},
 {ps:["группа е","группа e","связка 3","связка три","связка 3и","третья связка","третья группа","3 связка","3 группа","группа 3"],sl:2},
-{ps:["группа г","группа g","связка 4","связка четыре","связка 4е","четвёртая связка","четвертая связка","четвертая группа","4 связка","4 группа","группа 4"],sl:3}];
+{ps:["группа г","группа g","связка 4","связка четыре","связка 4е","четвёртая связка","четвертая связка","четвертая группа","4 связка","4 группа","группа 4"],sl:3},
+{ps:["связка 5","связка пять","пятая связка","5 связка","группа 5"],sl:4},
+{ps:["связка 6","связка шесть","шестая связка","6 связка","группа 6"],sl:5},
+{ps:["связка 7","связка семь","седьмая связка","7 связка","группа 7"],sl:6},
+{ps:["связка 8","связка восемь","восьмая связка","8 связка","группа 8"],sl:7},
+{ps:["связка 9","связка девять","девятая связка","9 связка","группа 9"],sl:8},
+{ps:["связка 10","связка десять","десятая связка","10 связка","группа 10"],sl:9}];
 
 function parseVoice(text){
   const lo=norm(text);const mk=[];
   for(const{ps,sl}of SLOT_KW)for(const p of ps){let i=lo.indexOf(p);while(i!==-1){mk.push({pos:i,len:p.length,sl});i=lo.indexOf(p,i+1);}}
   mk.sort((a,b)=>a.pos-b.pos);
   if(!mk.length)return[{sl:0,raw:text.trim()}];
-  const r=[];for(let i=0;i<mk.length;i++){const s=mk[i].pos+mk[i].len;const e=i<mk.length-1?mk[i+1].pos:lo.length;const c=text.substring(s,e).trim();if(c)r.push({sl:mk[i].sl,raw:c});}return r;
+  const r=[];for(let i=0;i<mk.length;i++){const s=mk[i].pos+mk[i].len;const e=i<mk.length-1?mk[i+1].pos:lo.length;const c=lo.substring(s,e).trim();if(c)r.push({sl:mk[i].sl,raw:c});}return r;
 }
 function splitEls(raw){return raw.split(/\s*(?:,|потом|далее|затем|дальше|следующий|следующая|и\s+потом)\s*/i).map(s=>s.trim()).filter(s=>s.length>0);}
 function smartSplit(raw,idx){
@@ -335,7 +341,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots}){
   };
 
   const apply=()=>{
-    if(!parsed)return;const ns=curSlots.map(s=>[...s]);const ex=new Set(curSlots.flat().map(e=>e.name));
+    if(!parsed)return;const maxSl=Math.max(curSlots.length-1,...parsed.map(p=>p.sl));const ns=Array.from({length:maxSl+1},(_, i)=>i<curSlots.length?[...curSlots[i]]:[]);const ex=new Set(curSlots.flat().map(e=>e.name));
     parsed.forEach(({sl,ms})=>ms.forEach(({el})=>{if(el&&!ex.has(el.name)){ns[sl].push(el);ex.add(el.name);}}));
     onApply(ns);setParsed(null);setTx("");setTi("");
   };
@@ -471,7 +477,7 @@ function AISettings(){
 
 /* ── Main App ── */
 function App(){
-  const[li,setLi]=useState(4);const[g,setG]=useState("M");const[slots,setSlots]=useState([[],[],[],[]]);
+  const[li,setLi]=useState(4);const[g,setG]=useState("M");const[slots,setSlots]=useState([[]]);
   const[showR,setShowR]=useState(false);const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);
   const[penalties,setPenalties]=useState({dirty:0,fall:0,dq:false});
   const[syn,setSyn]=useState(()=>LS.get("wu-syn")||{});
@@ -493,6 +499,8 @@ function App(){
   const add=(i,el)=>setSlots(p=>{const n=[...p];n[i]=[...n[i],el];return n;});
   const rem=(i,nm)=>setSlots(p=>{const n=[...p];n[i]=n[i].filter(e=>e.name!==nm);return n;});
   const move=(i,from,to)=>setSlots(p=>{const n=[...p];const s=[...n[i]];const el=s[from];s.splice(from,1);s.splice(to,0,el);n[i]=s;return n;});
+  const addSlot=()=>setSlots(p=>p.length<10?[...p,[]]:[...p]);
+  const removeSlot=(i)=>setSlots(p=>{if(p.length<=1)return p;const n=[...p];n.splice(i,1);return n;});
   const reqs=[{l:"Мин. баллы ("+(g==="M"?"М":"Ж")+")",v:minS},{l:"Связка 3+ эл.",v:"Да"},{l:"Эл. "+lv.num+" разряда",v:lv.minEl}].filter(r=>r.v>0&&r.v!=="0");
   const allOk=!penalties.dq&&sOk&&comboOk&&eOk&&all.length>0;
 
@@ -527,8 +535,9 @@ function App(){
     {showV&&<VoicePanel onApply={setSlots} synonyms={syn} onAddSyn={addSyn} slots={slots}/>}
 
     <SynPanel syn={syn} onRem={remSyn} onAdd={addSyn} elements={ELS}/>
-    <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Ручной выбор элементов (4 группы)</div>
-    {slots.map((slot,i)=>(<Pick key={i} label={SN[i]} color={SC[i]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)} onMove={(from,to)=>move(i,from,to)} synonyms={syn}/>))}
+    <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Связки ({slots.length})</div>
+    {slots.map((slot,i)=>(<div key={i} style={{position:"relative"}}>{slots.length>1&&<button onClick={()=>removeSlot(i)} style={{position:"absolute",top:0,right:0,width:24,height:24,borderRadius:6,border:"1px solid #334155",background:"#1e293b",color:"#64748b",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}} title="Удалить связку">×</button>}<Pick label={SN[i]||("Связка "+(i+1))} color={SC[i%SC.length]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)} onMove={(from,to)=>move(i,from,to)} synonyms={syn}/></div>))}
+    {slots.length<10&&<button onClick={addSlot} style={{width:"100%",padding:"12px",borderRadius:12,border:"1px dashed rgba(20,184,166,0.3)",background:"transparent",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:16}}>+ Добавить связку</button>}
 
     <div style={{marginTop:16,marginBottom:8,padding:16,background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:16,border:"1px solid #334155"}}>
       <div style={{fontSize:12,color:"#ef4444",marginBottom:12,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Штрафы</div>
@@ -563,7 +572,7 @@ function App(){
         let txt="ПРОТОКОЛ WU — "+d+"\n";
         txt+="Уровень: "+lv.name+" | Пол: "+(g==="M"?"Мужчины":"Женщины")+"\n";
         txt+="═══════════════════════════\n";
-        slots.forEach((s,i)=>{if(!s.length)return;txt+="\n"+SN[i]+":\n";s.forEach(el=>{txt+="  • "+el.name+" ("+el.cat+", "+el.score+" б.)\n";});});
+        slots.forEach((s,i)=>{if(!s.length)return;txt+="\n"+(SN[i]||("Связка "+(i+1)))+":\n";s.forEach(el=>{txt+="  • "+el.name+" ("+el.cat+", "+el.score+" б.)\n";});});
         txt+="\n═══════════════════════════\n";
         txt+="Элементы: "+raw.toFixed(1)+" | Баланс: +"+b.toFixed(1)+" | ИТОГО: "+tot.toFixed(1)+"\n";
         txt+="Статика: "+sC+" | Динамика: "+dC+"\n";
