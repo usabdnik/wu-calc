@@ -219,6 +219,8 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const[ti,setTi]=useState("");const[status,setStatus]=useState("");
   const[aiLoading,setAiLoading]=useState(false);
   const[micOk,setMicOk]=useState(null);
+  const[lastResult,setLastResult]=useState(null);/* {text, parsed, applied} — for review after apply */
+  const[showReview,setShowReview]=useState(false);
   const mediaRec=useRef(null);const chunks=useRef([]);
   const sidx=useMemo(()=>buildIdx(ELS,synonyms),[synonyms]);
 
@@ -302,6 +304,12 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const apply=()=>{
     if(!parsed)return;const maxSl=Math.max(curSlots.length-1,...parsed.map(p=>p.sl));const ns=Array.from({length:maxSl+1},(_, i)=>i<curSlots.length?[...curSlots[i]]:[]);const ex=new Set(curSlots.flat().map(e=>e.name));
     parsed.forEach(({sl,ms})=>ms.forEach(({el})=>{if(el&&!ex.has(el.name)){ns[sl].push(el);ex.add(el.name);}}));
+    /* Save for review */
+    const srcText=tx||ti;
+    const matched=[];const missed=[];
+    parsed.forEach(({sl,ms})=>ms.forEach(({q,el})=>{if(el)matched.push({q,name:el.name,sl});else missed.push({q,sl});}));
+    setLastResult({text:srcText,matched,missed,slots:parsed.map(p=>p.sl)});
+    setShowReview(missed.length>0);
     onApply(ns);setParsed(null);setTx("");setTi("");
   };
 
@@ -417,6 +425,26 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 
       {editCI===null&&unr.length===0&&parsed.some(c=>c.ms.some(m=>m.el))&&(<button onClick={apply} style={{marginTop:12,width:"100%",padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:"linear-gradient(135deg,#14b8a6,#0d9488)",color:"#020617"}}>✓ Применить связки</button>)}
       {unr.length>0&&(<div style={{marginTop:8,fontSize:12,color:"#f59e0b",textAlign:"center"}}>Осталось определить: {unr.length} элемент(ов)</div>)}
+    </div>)}
+
+    {/* Review panel — shows after apply */}
+    {lastResult&&(<div style={{borderTop:"1px solid #1e293b"}}>
+      <button onClick={()=>setShowReview(!showReview)} style={{width:"100%",padding:"10px 20px",background:"transparent",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",color:lastResult.missed.length>0?"#f59e0b":"#64748b",fontSize:12}}>
+        <span>{lastResult.missed.length>0?`⚠️ Пропущено: ${lastResult.missed.length}`:"✅ Все элементы распознаны"} — исходный текст</span>
+        <span style={{transform:showReview?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span>
+      </button>
+      {showReview&&(<div style={{padding:"0 20px 16px"}}>
+        <div style={{padding:12,background:"#0f172a",borderRadius:10,border:"1px solid #334155",fontSize:12,color:"#94a3b8",lineHeight:1.6,marginBottom:10,whiteSpace:"pre-wrap"}}>{lastResult.text}</div>
+        {lastResult.missed.length>0&&(<div style={{marginBottom:8}}>
+          <div style={{fontSize:11,color:"#ef4444",fontWeight:600,marginBottom:6}}>Не распознано:</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{lastResult.missed.map((m,i)=>(<span key={i} style={{padding:"3px 8px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,fontSize:11,color:"#ef4444"}}>"{m.q}"</span>))}</div>
+        </div>)}
+        {lastResult.matched.length>0&&(<div>
+          <div style={{fontSize:11,color:"#14b8a6",fontWeight:600,marginBottom:6}}>Распознано ({lastResult.matched.length}):</div>
+          <div style={{display:"flex",flexDirection:"column",gap:3}}>{lastResult.matched.map((m,i)=>(<div key={i} style={{fontSize:11,color:"#94a3b8",display:"flex",gap:4}}><span style={{color:"#64748b"}}>"{m.q}"</span><span style={{color:"#475569"}}>→</span><span style={{color:"#e2e8f0"}}>{m.name}</span></div>))}</div>
+        </div>)}
+        <button onClick={()=>{setLastResult(null);setShowReview(false);}} style={{marginTop:10,padding:"6px 14px",borderRadius:8,border:"1px solid #334155",background:"#1e293b",color:"#64748b",fontSize:11,cursor:"pointer"}}>Скрыть</button>
+      </div>)}
     </div>)}
   </div>);
 }
