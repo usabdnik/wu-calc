@@ -83,10 +83,11 @@ function useVoiceSearch(){
         const blob=new Blob(chRef.current,{type:mr.mimeType});
         if(blob.size<100){setListening(false);return;}
         try{const text=await whisperTranscribe(blob);if(cbRef.current&&text.trim())cbRef.current(text.trim());}
-        catch(e){}
+        catch(e){console.error("Whisper error:",e);}
         setListening(false);mrRef.current=null;
       };
-      mrRef.current=mr;mr.start();setListening(true);
+      mrRef.current=mr;mr.start(1000);setListening(true);
+      setTimeout(()=>{if(mrRef.current&&mrRef.current.state==="recording")try{mrRef.current.stop();}catch(e){}},180000);
     }).catch(()=>{setListening(false);});
   },[]);
   const stop=useCallback(()=>{if(mrRef.current&&mrRef.current.state==="recording")try{mrRef.current.stop();}catch(e){}else setListening(false);},[]);
@@ -255,7 +256,8 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
         catch(e){setStatus("⛔ "+e.message);}
         setOn(false);
       };
-      mediaRec.current=mr;mr.start();setOn(true);setStatus("🎤 Запись...");setItx("");
+      mediaRec.current=mr;mr.start(1000);setOn(true);setStatus("🎤 Запись...");setItx("");
+      setTimeout(()=>{if(mediaRec.current&&mediaRec.current.state==="recording")try{mediaRec.current.stop();}catch(e){}},180000);
     }catch(e){setStatus("Ошибка записи: "+e.message);setOn(false);}
   };
 
