@@ -211,16 +211,7 @@ const DEMO_BASE=[
 {athleteIdx:16,id:"100054",group:"A-218",name:"Внукова Софья Дмитриевна",sex:"ж",age:8,level:"BASE 2",otj:25,podt:8,br:12,pl:0,pres:0,vyh:2,score:34.5,passed:true,checks:{otj:true,podt:true,br:true,pl:true,pres:true,vyh:true}}
 ];
 
-function initDemo(){
-  const existing=localStorage.getItem("comp_athletes");
-  const needsReset=!existing||existing==="[]"||existing==="null"||existing.includes('"gender"')||existing.includes('"targetLevel"');
-  if(needsReset){
-    localStorage.setItem("comp_athletes",JSON.stringify(DEMO_ATHLETES));
-    localStorage.setItem("comp_freestyle_results",JSON.stringify(DEMO_FREESTYLE));
-    localStorage.setItem("comp_base_results",JSON.stringify(DEMO_BASE));
-  }
-}
-initDemo();
+// initDemo disabled — production mode, data comes from sync or manual entry
 
 /* ========== HELPERS ========== */
 function loadLS(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def}catch{return def}}
