@@ -1113,6 +1113,18 @@ function SyncBar({syncManager,onSyncComplete,currentData,toast}){
     return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};
   },[]);
 
+  // Auto-select latest active event if none selected
+  useEffect(()=>{
+    if(syncManager.eventId)return;
+    syncManager.fetchEvents().then(events=>{
+      const active=events.filter(e=>e.status==='active');
+      if(active.length>0){
+        syncManager.setEventId(active[0].id);
+        setStatus('idle');
+      }
+    }).catch(()=>{});
+  },[]);
+
   async function handleSync(){
     if(!syncManager.isConfigured){setShowEventSelector(true);return;}
     if(!syncManager.lastSyncAt){
