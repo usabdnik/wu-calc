@@ -929,7 +929,7 @@ class SyncManager {
   _loadTimestamps(){return JSON.parse(localStorage.getItem('comp_sync_timestamps')||'{}');}
   _saveTimestamps(){localStorage.setItem('comp_sync_timestamps',JSON.stringify(this.timestamps));}
   _headers(){return{'Content-Type':'application/json','X-API-Key':this._getApiKey()};}
-  _getApiKey(){try{const cfg=JSON.parse(localStorage.getItem('wu-ai')||'{}');return cfg.key||'';}catch{return '';}}
+  _getApiKey(){return 'SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE';}
   _getRecordKey(record,recordType){
     if(recordType==='age_categories_freestyle'||recordType==='age_categories_base')return record.name;
     return record.id;
