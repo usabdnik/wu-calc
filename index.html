@@ -499,11 +499,27 @@ function AISettings(){
 /* ── AI defaults init ── */
 (function(){const s=LS.get("wu-ai");if(!s||!s.url||!s.key)LS.set("wu-ai",{url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});})();
 
+/* ── Protocol integration ── */
+function getCompAthletes(){try{const v=localStorage.getItem("comp_athletes");return v?JSON.parse(v).filter(a=>a.dir==="freestyle"):[];}catch{return[];}}
+function sendToProtocol(athlete,data){
+  const key="comp_freestyle_results";
+  let results=[];try{results=JSON.parse(localStorage.getItem(key))||[];}catch{}
+  const idx=results.findIndex(r=>r.id===athlete.id);
+  const entry={athleteIdx:0,id:athlete.id,group:athlete.group,name:athlete.name,sex:athlete.sex,age:athlete.age,level:athlete.level,...data};
+  // find athleteIdx from comp_athletes
+  try{const all=JSON.parse(localStorage.getItem("comp_athletes"))||[];const ai=all.findIndex(a=>a.id===athlete.id);if(ai>=0)entry.athleteIdx=ai;}catch{}
+  if(idx>=0)results[idx]=entry;else results.push(entry);
+  localStorage.setItem(key,JSON.stringify(results));
+}
+
 /* ── Main App ── */
 function App(){
   const[li,setLi]=useState(4);const[g,setG]=useState("M");const[slots,setSlots]=useState([[]]);
   const[showR,setShowR]=useState(false);const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);
   const[penalties,setPenalties]=useState({dirty:0,fall:0,dq:false});
+  const[selAthlete,setSelAthlete]=useState("");
+  const[protocolSent,setProtocolSent]=useState("");
+  const compAthletes=useMemo(()=>getCompAthletes(),[]);
   const addPenalty=useCallback((type)=>{if(type==="dq")setPenalties(p=>({...p,dq:true}));else setPenalties(p=>({...p,[type]:p[type]+1}));},[]);
   const[syn,setSyn]=useState(()=>LS.get("wu-syn")||{});
   const[synStatus,setSynStatus]=useState("");
@@ -528,7 +544,8 @@ function App(){
   },[]);
 
   const lv=LEVELS[li];const minS=g==="M"?lv.minM:lv.minF;
-  const all=useMemo(()=>slots.flat(),[slots]);
+  const allRaw=useMemo(()=>slots.flat(),[slots]);
+  const all=useMemo(()=>{const seen=new Set();return allRaw.filter(e=>{if(seen.has(e.name))return false;seen.add(e.name);return true;});},[allRaw]);
   const sC=all.filter(e=>e.cat==="Статика").length;const dC=all.filter(e=>e.cat==="Динамика").length;
   const raw=all.reduce((s,e)=>s+e.score,0);const b=bal(sC,dC,lv.num);
   const penaltyScore=penalties.dirty*2+penalties.fall*4;
@@ -550,6 +567,15 @@ function App(){
       <button onClick={()=>setShowAI(!showAI)} style={{position:"absolute",top:24,right:0,width:36,height:36,borderRadius:10,border:"1px solid #334155",background:showAI?"rgba(168,85,247,0.15)":"#1e293b",color:showAI?"#a855f7":"#64748b",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>⚙️</button>
     </div>
     {showAI&&<AISettings/>}
+
+    {compAthletes.length>0&&<div style={{marginBottom:16,padding:12,background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}>
+      <div style={{fontSize:11,color:"#a855f7",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Спортсмен (соревнования)</div>
+      <select value={selAthlete} onChange={e=>{const v=e.target.value;setSelAthlete(v);if(v){const a=compAthletes.find(x=>x.id===v);if(a){setG(a.sex==="ж"?"F":"M");const li2=LEVELS.findIndex(l=>l.name===a.level);if(li2>=0)setLi(li2);}}}} style={{width:"100%",padding:"10px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:10,color:"#e2e8f0",fontSize:14,cursor:"pointer"}}>
+        <option value="">— Без привязки —</option>
+        {compAthletes.map(a=><option key={a.id} value={a.id}>{a.name} — {a.level} ({a.sex==="ж"?"Ж":"М"})</option>)}
+      </select>
+      {protocolSent&&<div style={{fontSize:12,color:"#22c55e",marginTop:6,textAlign:"center"}}>{protocolSent}</div>}
+    </div>}
 
     <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:16}}>{["M","F"].map(x=>(<button key={x} onClick={()=>setG(x)} style={{padding:"8px 28px",borderRadius:10,border:"none",cursor:"pointer",fontSize:14,fontWeight:600,background:g===x?(x==="M"?"#14b8a6":"#f472b6"):"#1e293b",color:g===x?"#020617":"#64748b",transition:"all 0.2s"}}>{x==="M"?"Мужчины":"Женщины"}</button>))}</div>
 
@@ -624,6 +650,14 @@ function App(){
         if(navigator.share){navigator.share({title:"Протокол WU",text:txt}).catch(()=>{});}
         else{navigator.clipboard.writeText(txt).then(()=>alert("Скопировано!")).catch(()=>{const w=window.open();w.document.write("<pre>"+txt+"</pre>");});}
       }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",background:"rgba(20,184,166,0.1)",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer"}}>📋 Протокол</button>
+      {selAthlete&&<button onClick={()=>{
+        const a=compAthletes.find(x=>x.id===selAthlete);if(!a)return;
+        const statika=all.filter(e=>e.cat==="Статика").reduce((s,e)=>s+e.score,0);
+        const dynamika=all.filter(e=>e.cat==="Динамика").reduce((s,e)=>s+e.score,0);
+        sendToProtocol(a,{statika,dynamika,combo:Math.round(b*100)/100,universality:0,creative:0,dirty:penalties.dirty,fall:penalties.fall,dsk:penalties.dq,comboCheck:comboOk,minElCheck:eOk,penalties:penaltyScore,total:Math.round(tot*100)/100,passed:allOk});
+        setProtocolSent("Отправлено в протокол: "+a.name+" — "+tot.toFixed(1)+" б.");
+        setTimeout(()=>setProtocolSent(""),4000);
+      }} style={{marginTop:8,marginLeft:8,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(168,85,247,0.3)",background:"rgba(168,85,247,0.1)",color:"#a855f7",fontSize:13,fontWeight:600,cursor:"pointer"}}>🏆 В протокол</button>}
     </div>)}
     <div style={{textAlign:"center",padding:"32px 0 16px",fontSize:11,color:"#334155"}}>WU Calculator v2 — Голос + Синонимы — {ELS.length} эл.</div>
   </div></div>);

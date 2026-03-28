@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#14b8a6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WU Протокол">
+<title>WU Протокол Соревнований</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#020617;font-family:system-ui,-apple-system,sans-serif;color:#e2e8f0;overflow-x:hidden;min-height:100vh}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#0f172a}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
+input,select,textarea,button{font-family:inherit;font-size:inherit}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.header{background:#0f172a;border-bottom:1px solid #334155;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:18px;font-weight:700;color:#14b8a6}
+.header a{color:#94a3b8;text-decoration:none;font-size:14px}
+.header a:hover{color:#14b8a6}
+
+.tabs{display:flex;background:#0f172a;border-bottom:1px solid #334155;position:sticky;top:49px;z-index:99;overflow-x:auto}
+.tabs button{flex:1;min-width:0;padding:10px 8px;background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.tabs button.active{color:#14b8a6;border-bottom-color:#14b8a6;background:#14b8a611}
+.tabs button:hover:not(.active){color:#e2e8f0}
+
+.container{max-width:1200px;margin:0 auto;padding:16px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:16px;animation:fadeIn .3s ease}
+
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;transition:all .2s}
+.btn-primary{background:#14b8a6;color:#020617}
+.btn-primary:hover{background:#0d9488}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-secondary{background:#334155;color:#e2e8f0}
+.btn-secondary:hover{background:#475569}
+.btn-success{background:#22c55e;color:#020617}
+.btn-success:hover{background:#16a34a}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+input[type="number"],input[type="text"],select,textarea{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px 12px;color:#e2e8f0;width:100%;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:#14b8a6}
+textarea{resize:vertical;min-height:100px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#0f172a;color:#94a3b8;font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid #334155;position:sticky;top:0;white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid #334155}
+tr:hover{background:#ffffff08}
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid #334155}
+
+.form-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end}
+.form-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px}
+.form-group label{font-size:12px;color:#94a3b8;font-weight:500}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.badge-pass{background:#22c55e22;color:#22c55e}
+.badge-fail{background:#ef444422;color:#ef4444}
+.badge-female{background:#f472b622;color:#f472b6}
+.badge-male{background:#60a5fa22;color:#60a5fa}
+
+.score-big{font-size:32px;font-weight:800;color:#f59e0b;text-align:center;margin:12px 0}
+.result-pass{color:#22c55e;font-weight:700}
+.result-fail{color:#ef4444;font-weight:700}
+.row-pass{background:#22c55e0a}
+.row-fail{background:#ef44440a}
+
+.penalty-ctrl{display:flex;align-items:center;gap:8px}
+.penalty-ctrl button{width:28px;height:28px;border-radius:6px;border:none;background:#334155;color:#e2e8f0;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.penalty-ctrl button:hover{background:#475569}
+.penalty-ctrl span{min-width:20px;text-align:center;font-weight:600}
+
+.norm-ok{color:#22c55e;font-weight:600}
+.norm-fail{color:#ef4444;font-weight:600}
+
+.section-title{font-size:16px;font-weight:700;color:#14b8a6;margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid #334155}
+.empty{text-align:center;color:#64748b;padding:24px;font-style:italic}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#22c55e;color:#020617;padding:10px 24px;border-radius:10px;font-weight:600;z-index:200;animation:fadeIn .3s ease}
+
+.age-cat-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.age-cat-row input{width:80px;flex:none}
+.age-cat-row .cat-name{width:100px}
+
+.footer{text-align:center;padding:24px 16px;color:#64748b;font-size:13px;border-top:1px solid #334155;margin-top:32px}
+.footer a{color:#14b8a6;text-decoration:none}
+
+.confirm-overlay{position:fixed;inset:0;background:#00000088;display:flex;align-items:center;justify-content:center;z-index:300}
+.confirm-box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;max-width:400px;width:90%;text-align:center}
+.confirm-box p{margin-bottom:16px;font-size:15px}
+.confirm-box .btn-row{display:flex;gap:12px;justify-content:center}
+
+@media(max-width:480px){
+  .tabs button{font-size:11px;padding:8px 4px}
+  .container{padding:10px}
+  .card{padding:12px}
+  .form-row{flex-direction:column}
+  .form-group{min-width:100%}
+  table{font-size:11px}
+  td,th{padding:4px 6px}
+  .header h1{font-size:15px}
+  .score-big{font-size:24px}
+}
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useCallback,useRef}=React;
+
+/* ========== DATA ========== */
+const LEVELS=[
+{name:"SPIRIT 1 Biginner",num:1,minEl:0,minM:0,minF:0},
+{name:"SPIRIT 1 Diligent",num:1,minEl:0,minM:0,minF:0},
+{name:"SPIRIT 1 Prepared",num:1,minEl:3,minM:10,minF:7.5},
+{name:"SPIRIT 2",num:2,minEl:5,minM:24,minF:18},
+{name:"SPIRIT 3",num:3,minEl:6,minM:39,minF:29.25},
+{name:"SPIRIT 4",num:4,minEl:8,minM:56,minF:42},
+{name:"SPIRIT 5",num:5,minEl:10,minM:73.5,minF:55.125},
+{name:"FREESTYLE 6",num:6,minEl:11,minM:87.5,minF:65.625},
+{name:"FREESTYLE 7",num:7,minEl:11,minM:101.5,minF:76.125},
+{name:"FREESTYLE 8",num:8,minEl:8,minM:107.25,minF:80.4375},
+{name:"FREESTYLE 9",num:9,minEl:8,minM:111,minF:83.25},
+{name:"FREESTYLE 10",num:10,minEl:4,minM:110,minF:82.5}
+];
+const FREESTYLE_LEVELS=LEVELS;
+
+const BASE_LEVELS=[
+{name:"BASE 2",otj:20,podt:5,br:10,pl:0,pres:0,vyh:0},
+{name:"BASE 3",otj:30,podt:10,br:20,pl:4,pres:3,vyh:0},
+{name:"BASE 4",otj:40,podt:15,br:30,pl:4,pres:6,vyh:0},
+{name:"BASE 5",otj:50,podt:20,br:40,pl:5,pres:6,vyh:5},
+{name:"BASE 6",otj:65,podt:25,br:50,pl:0,pres:20,vyh:10},
+{name:"BASE 7",otj:70,podt:30,br:55,pl:0,pres:25,vyh:15},
+{name:"BASE 8",otj:80,podt:35,br:60,pl:0,pres:30,vyh:20},
+{name:"BASE 9",otj:90,podt:40,br:70,pl:0,pres:35,vyh:25},
+{name:"BASE 10",otj:110,podt:45,br:80,pl:0,pres:40,vyh:30}
+];
+const BASE_COEF={otj:0.5,podt:2,br:1,vyh:3};
+
+const DEFAULT_AGE_CATS=[
+{name:"8-11",min:8,max:11},
+{name:"12-13",min:12,max:13},
+{name:"14-15",min:14,max:15},
+{name:"16+",min:16,max:99}
+];
+
+const TAB_NAMES=["Участники","Судейство","Протокол","Призёры","Грамоты"];
+
+/* ========== DEMO DATA ========== */
+const DEMO_ATHLETES=[
+{id:"100006",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 3",dir:"freestyle"},
+{id:"100009",group:"М-217",name:"Байгозин Константин Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
+{id:"100016",group:"М-217",name:"Хорин Данил Денисович",sex:"м",age:9,level:"SPIRIT 2",dir:"freestyle"},
+{id:"100020",group:"A-219",name:"Колеватов Иван Романович",sex:"м",age:14,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+{id:"100023",group:"М-117",name:"Стерхов Илья Андреевич",sex:"м",age:15,level:"SPIRIT 4",dir:"freestyle"},
+{id:"100036",group:"М-19",name:"Тумбаков Арсентий Николаевич",sex:"м",age:14,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+{id:"100035",group:"М-117",name:"Касаткин Ярослав Павлович",sex:"м",age:17,level:"SPIRIT 5",dir:"freestyle"},
+{id:"100012",group:"М-118",name:"Чумаков Дмитрий Васильевич",sex:"м",age:9,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+{id:"100040",group:"М-117",name:"Кулаков Кирилл Никитич",sex:"м",age:11,level:"SPIRIT 3",dir:"freestyle"},
+{id:"100041",group:"М-117",name:"Клементьев Илья Андреевич",sex:"м",age:11,level:"SPIRIT 3",dir:"freestyle"},
+{id:"100042",group:"М-118",name:"Скобелев Дамир Алексеевич",sex:"м",age:11,level:"SPIRIT 3",dir:"freestyle"},
+{id:"100019",group:"М-115",name:"Ломаев Максим Игоревич",sex:"м",age:12,level:"SPIRIT 1 Diligent",dir:"base"},
+{id:"100050",group:"М-117",name:"Логинов Андрей Сергеевич",sex:"м",age:16,level:"BASE 5",dir:"base"},
+{id:"100051",group:"A-218",name:"Вахрушев Савелий Александрович",sex:"м",age:10,level:"BASE 2",dir:"base"},
+{id:"100052",group:"A-218",name:"Чесноков Александр Александрович",sex:"м",age:45,level:"BASE 2",dir:"base"},
+{id:"100053",group:"A-218",name:"Трудолюбов Лев Александрович",sex:"м",age:12,level:"BASE 2",dir:"base"},
+{id:"100054",group:"A-218",name:"Внукова Софья Дмитриевна",sex:"ж",age:8,level:"BASE 2",dir:"base"},
+{id:"100043",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 3",dir:"freestyle"},
+{id:"100055",group:"М-117",name:"Попков Константин Сергеевич",sex:"м",age:13,level:"SPIRIT 1 Prepared",dir:"freestyle"}
+];
+
+// Demo freestyle results — fields match saveFreestyle() output
+// athleteIdx = index in DEMO_ATHLETES array
+const DEMO_FREESTYLE=[
+{athleteIdx:0,id:"100006",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 3",statika:18,dynamika:40,combo:2.2,universality:0.5,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:60.7,passed:true},
+{athleteIdx:1,id:"100009",group:"М-217",name:"Байгозин Константин Николаевич",sex:"м",age:14,level:"SPIRIT 2",statika:18,dynamika:20,combo:1,universality:1.5,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:40.5,passed:true},
+{athleteIdx:2,id:"100016",group:"М-217",name:"Хорин Данил Денисович",sex:"м",age:9,level:"SPIRIT 2",statika:17,dynamika:8,combo:0.5,universality:0.9,creative:0,dirty:1,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:2,total:24.4,passed:true},
+{athleteIdx:3,id:"100020",group:"A-219",name:"Колеватов Иван Романович",sex:"м",age:14,level:"SPIRIT 1 Prepared",statika:14,dynamika:10,combo:0,universality:0.5,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:24.5,passed:true},
+{athleteIdx:4,id:"100023",group:"М-117",name:"Стерхов Илья Андреевич",sex:"м",age:15,level:"SPIRIT 4",statika:40,dynamika:19,combo:0,universality:3,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:62,passed:true},
+{athleteIdx:5,id:"100036",group:"М-19",name:"Тумбаков Арсентий Николаевич",sex:"м",age:14,level:"SPIRIT 1 Prepared",statika:6,dynamika:20,combo:1,universality:0,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:27,passed:true},
+{athleteIdx:6,id:"100035",group:"М-117",name:"Касаткин Ярослав Павлович",sex:"м",age:17,level:"SPIRIT 5",statika:50,dynamika:40,combo:3,universality:6,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:99,passed:true},
+{athleteIdx:7,id:"100012",group:"М-118",name:"Чумаков Дмитрий Васильевич",sex:"м",age:9,level:"SPIRIT 1 Prepared",statika:15,dynamika:14,combo:1,universality:1,creative:0,dirty:2,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:4,total:27,passed:true},
+{athleteIdx:8,id:"100040",group:"М-117",name:"Кулаков Кирилл Никитич",sex:"м",age:11,level:"SPIRIT 3",statika:20,dynamika:38,combo:2,universality:0.8,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:60.8,passed:true},
+{athleteIdx:9,id:"100041",group:"М-117",name:"Клементьев Илья Андреевич",sex:"м",age:11,level:"SPIRIT 3",statika:22,dynamika:35,combo:2,universality:1,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:60,passed:true},
+{athleteIdx:10,id:"100042",group:"М-118",name:"Скобелев Дамир Алексеевич",sex:"м",age:11,level:"SPIRIT 3",statika:20,dynamika:36,combo:1.4,universality:1,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:58.4,passed:true},
+{athleteIdx:17,id:"100043",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 3",statika:10,dynamika:20,combo:1,universality:0,creative:0,dirty:1,fall:0,dsk:false,comboCheck:true,minElCheck:false,penalties:2,total:29,passed:false},
+{athleteIdx:18,id:"100055",group:"М-117",name:"Попков Константин Сергеевич",sex:"м",age:13,level:"SPIRIT 1 Prepared",statika:5,dynamika:8,combo:0,universality:0,creative:0,dirty:0,fall:1,dsk:false,comboCheck:false,minElCheck:false,penalties:4,total:9,passed:false}
+];
+
+// Demo base results — fields match saveBase() output
+const DEMO_BASE=[
+{athleteIdx:11,id:"100019",group:"М-115",name:"Ломаев Максим Игоревич",sex:"м",age:12,level:"SPIRIT 1 Diligent",otj:40,podt:7,br:0,pl:0,pres:0,vyh:0,score:34,passed:true,checks:{otj:true,podt:true,br:true,pl:true,pres:true,vyh:true}},
+{athleteIdx:12,id:"100050",group:"М-117",name:"Логинов Андрей Сергеевич",sex:"м",age:16,level:"BASE 5",otj:50,podt:25,br:40,pl:8,pres:10,vyh:6,score:118,passed:true,checks:{otj:true,podt:true,br:true,pl:true,pres:true,vyh:true}},
+{athleteIdx:13,id:"100051",group:"A-218",name:"Вахрушев Савелий Александрович",sex:"м",age:10,level:"BASE 2",otj:25,podt:5,br:10,pl:0,pres:0,vyh:0,score:22.5,passed:true,checks:{otj:true,podt:true,br:true,pl:true,pres:true,vyh:true}},
+{athleteIdx:14,id:"100052",group:"A-218",name:"Чесноков Александр Александрович",sex:"м",age:45,level:"BASE 2",otj:30,podt:8,br:12,pl:0,pres:0,vyh:3,score:40,passed:true,checks:{otj:true,podt:true,br:true,pl:true,pres:true,vyh:true}},
+{athleteIdx:15,id:"100053",group:"A-218",name:"Трудолюбов Лев Александрович",sex:"м",age:12,level:"BASE 2",otj:15,podt:3,br:5,pl:0,pres:0,vyh:0,score:14.5,passed:false,checks:{otj:false,podt:false,br:false,pl:true,pres:true,vyh:true}},
+{athleteIdx:16,id:"100054",group:"A-218",name:"Внукова Софья Дмитриевна",sex:"ж",age:8,level:"BASE 2",otj:25,podt:8,br:12,pl:0,pres:0,vyh:2,score:34.5,passed:true,checks:{otj:true,podt:true,br:true,pl:true,pres:true,vyh:true}}
+];
+
+function initDemo(){
+  const existing=localStorage.getItem("comp_athletes");
+  const needsReset=!existing||existing==="[]"||existing==="null"||existing.includes('"gender"')||existing.includes('"targetLevel"');
+  if(needsReset){
+    localStorage.setItem("comp_athletes",JSON.stringify(DEMO_ATHLETES));
+    localStorage.setItem("comp_freestyle_results",JSON.stringify(DEMO_FREESTYLE));
+    localStorage.setItem("comp_base_results",JSON.stringify(DEMO_BASE));
+  }
+}
+initDemo();
+
+/* ========== HELPERS ========== */
+function loadLS(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def}catch{return def}}
+function saveLS(key,val){localStorage.setItem(key,JSON.stringify(val))}
+function findLevel(name){return LEVELS.find(l=>l.name===name)}
+function findBaseLevel(name){return BASE_LEVELS.find(l=>l.name===name)}
+
+/* ========== TOAST ========== */
+function Toast({msg,onDone}){
+  useEffect(()=>{const t=setTimeout(onDone,2000);return()=>clearTimeout(t)},[onDone]);
+  return <div className="toast">{msg}</div>;
+}
+
+/* ========== CONFIRM DIALOG ========== */
+function ConfirmDialog({msg,onYes,onNo}){
+  return <div className="confirm-overlay" onClick={onNo}>
+    <div className="confirm-box" onClick={e=>e.stopPropagation()}>
+      <p>{msg}</p>
+      <div className="btn-row">
+        <button className="btn btn-danger" onClick={onYes}>Да</button>
+        <button className="btn btn-secondary" onClick={onNo}>Отмена</button>
+      </div>
+    </div>
+  </div>;
+}
+
+/* ========== TAB 1: ATHLETES ========== */
+function AthletesTab({athletes,setAthletes}){
+  const [csv,setCsv]=useState("");
+  const [form,setForm]=useState({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"freestyle"});
+  const [confirm,setConfirm]=useState(false);
+
+  const allLevelNames=[...LEVELS.map(l=>l.name),...BASE_LEVELS.map(l=>l.name)];
+
+  function importCsv(){
+    if(!csv.trim())return;
+    const lines=csv.trim().split("\n").filter(l=>l.trim());
+    const newAthletes=[];
+    for(const line of lines){
+      const parts=line.split(";").map(s=>s.trim());
+      if(parts.length<7)continue;
+      const [id,group,name,sex,age,level,dir]=parts;
+      newAthletes.push({id,group,name,sex:sex.toLowerCase(),age:parseInt(age)||0,level,dir:dir.toLowerCase()});
+    }
+    if(newAthletes.length>0){
+      setAthletes(prev=>[...prev,...newAthletes]);
+      setCsv("");
+    }
+  }
+
+  function addManual(){
+    if(!form.name.trim())return;
+    const a={...form,id:form.id||String(Date.now()),age:parseInt(form.age)||0,sex:form.sex.toLowerCase(),dir:form.dir.toLowerCase()};
+    setAthletes(prev=>[...prev,a]);
+    setForm({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"freestyle"});
+  }
+
+  function removeAthlete(idx){setAthletes(prev=>prev.filter((_,i)=>i!==idx))}
+  function clearAll(){setConfirm(true)}
+
+  return <div>
+    <div className="card">
+      <h3 style={{marginBottom:12,color:"#14b8a6"}}>Импорт CSV</h3>
+      <p style={{fontSize:12,color:"#64748b",marginBottom:8}}>Формат: id;группа;ФИО;пол;возраст;уровень;направление</p>
+      <textarea value={csv} onChange={e=>setCsv(e.target.value)} placeholder="100006;М-118;Трескин Кирилл Денисович;м;12;SPIRIT 3;freestyle"/>
+      <div style={{marginTop:8}}>
+        <button className="btn btn-primary" onClick={importCsv}>Импорт</button>
+      </div>
+    </div>
+
+    <div className="card">
+      <h3 style={{marginBottom:12,color:"#14b8a6"}}>Добавить участника</h3>
+      <div className="form-row">
+        <div className="form-group"><label>ID</label><input type="text" value={form.id} onChange={e=>setForm({...form,id:e.target.value})} placeholder="Авто"/></div>
+        <div className="form-group"><label>Группа</label><input type="text" value={form.group} onChange={e=>setForm({...form,group:e.target.value})}/></div>
+        <div className="form-group"><label>ФИО *</label><input type="text" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
+      </div>
+      <div className="form-row">
+        <div className="form-group"><label>Пол</label>
+          <select value={form.sex} onChange={e=>setForm({...form,sex:e.target.value})}><option value="м">М</option><option value="ж">Ж</option></select>
+        </div>
+        <div className="form-group"><label>Возраст</label><input type="number" value={form.age} onChange={e=>setForm({...form,age:e.target.value})} min="0"/></div>
+        <div className="form-group"><label>Уровень</label>
+          <select value={form.level} onChange={e=>setForm({...form,level:e.target.value})}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select>
+        </div>
+        <div className="form-group"><label>Направление</label>
+          <select value={form.dir} onChange={e=>setForm({...form,dir:e.target.value})}><option value="freestyle">Freestyle</option><option value="base">Base</option></select>
+        </div>
+      </div>
+      <button className="btn btn-primary" onClick={addManual}>Добавить</button>
+    </div>
+
+    <div className="card">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h3 style={{color:"#14b8a6"}}>Участники ({athletes.length})</h3>
+        {athletes.length>0&&<button className="btn btn-danger btn-sm" onClick={clearAll}>Очистить всех</button>}
+      </div>
+      {athletes.length===0?<div className="empty">Нет загруженных участников</div>:
+      <div className="table-wrap"><table>
+        <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Пол</th><th>Лет</th><th>Уровень</th><th>Напр.</th><th></th></tr></thead>
+        <tbody>{athletes.map((a,i)=><tr key={i}>
+          <td>{a.id}</td><td>{a.group}</td><td>{a.name}</td>
+          <td><span className={(a.sex||"")=="ж"?"badge badge-female":"badge badge-male"}>{(a.sex||"?").toUpperCase()}</span></td>
+          <td>{a.age}</td><td>{a.level}</td><td>{a.dir}</td>
+          <td><button className="btn btn-danger btn-sm" onClick={()=>removeAthlete(i)}>×</button></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>
+
+    {confirm&&<ConfirmDialog msg="Удалить всех участников?" onYes={()=>{setAthletes([]);setConfirm(false)}} onNo={()=>setConfirm(false)}/>}
+  </div>;
+}
+
+/* ========== TAB 2: JUDGING ========== */
+function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,setBaseResults,toast}){
+  const [selIdx,setSelIdx]=useState("");
+  const [filter,setFilter]=useState("all");
+
+  // Freestyle form
+  const [statika,setStatika]=useState(0);
+  const [dynamika,setDynamika]=useState(0);
+  const [combo,setCombo]=useState(0);
+  const [universality,setUniversality]=useState(0);
+  const [creative,setCreative]=useState(0);
+  const [dirty,setDirty]=useState(0);
+  const [fall,setFall]=useState(0);
+  const [dsk,setDsk]=useState(false);
+  const [comboCheck,setComboCheck]=useState(false);
+  const [minElCheck,setMinElCheck]=useState(false);
+
+  // Base form
+  const [otj,setOtj]=useState(0);
+  const [podt,setPodt]=useState(0);
+  const [br,setBr]=useState(0);
+  const [pl,setPl]=useState(0);
+  const [pres,setPres]=useState(0);
+  const [vyh,setVyh]=useState(0);
+
+  const filtered=useMemo(()=>{
+    return athletes.map((a,i)=>({...a,_idx:i})).filter(a=>filter==="all"||a.dir===filter);
+  },[athletes,filter]);
+
+  const judgedIds=useMemo(()=>{
+    const s=new Set();
+    freestyleResults.forEach(r=>s.add(r.athleteIdx));
+    baseResults.forEach(r=>s.add(r.athleteIdx));
+    return s;
+  },[freestyleResults,baseResults]);
+
+  const selected=selIdx!==""?athletes[parseInt(selIdx)]:null;
+
+  function resetFreestyleForm(){setStatika(0);setDynamika(0);setCombo(0);setUniversality(0);setCreative(0);setDirty(0);setFall(0);setDsk(false);setComboCheck(false);setMinElCheck(false)}
+  function resetBaseForm(){setOtj(0);setPodt(0);setBr(0);setPl(0);setPres(0);setVyh(0)}
+
+  useEffect(()=>{resetFreestyleForm();resetBaseForm()},[selIdx]);
+
+  function selectNextUnjudged(){
+    const next=filtered.find(a=>!judgedIds.has(a._idx)&&a._idx!==parseInt(selIdx));
+    if(next)setSelIdx(String(next._idx));
+    else setSelIdx("");
+  }
+
+  function saveFreestyle(){
+    if(!selected)return;
+    const lvl=findLevel(selected.level);
+    const penalties=dirty*2+fall*4;
+    const total=statika+dynamika+combo+universality+creative-penalties;
+    const minScore=selected.sex==="ж"?lvl.minF:lvl.minM;
+    const passed=!dsk&&comboCheck&&minElCheck&&total>=minScore;
+
+    const result={
+      athleteIdx:parseInt(selIdx),
+      id:selected.id,group:selected.group,name:selected.name,sex:selected.sex,age:selected.age,
+      level:selected.level,
+      statika,dynamika,combo,universality,creative,
+      dirty,fall,dsk,comboCheck,minElCheck,
+      penalties,total:Math.round(total*100)/100,passed
+    };
+    setFreestyleResults(prev=>{
+      const exists=prev.findIndex(r=>r.athleteIdx===result.athleteIdx);
+      if(exists>=0){const n=[...prev];n[exists]=result;return n}
+      return [...prev,result];
+    });
+    toast("Результат сохранён!");
+    setTimeout(selectNextUnjudged,100);
+  }
+
+  function saveBase(){
+    if(!selected)return;
+    const blvl=findBaseLevel(selected.level);
+    if(!blvl)return;
+    const score=otj*BASE_COEF.otj+podt*BASE_COEF.podt+br*BASE_COEF.br+vyh*BASE_COEF.vyh;
+    const checks={
+      otj:blvl.otj===0||otj>=blvl.otj,
+      podt:blvl.podt===0||podt>=blvl.podt,
+      br:blvl.br===0||br>=blvl.br,
+      pl:blvl.pl===0||pl>=blvl.pl,
+      pres:blvl.pres===0||pres>=blvl.pres,
+      vyh:blvl.vyh===0||vyh>=blvl.vyh
+    };
+    const allPassed=Object.values(checks).every(Boolean);
+
+    const result={
+      athleteIdx:parseInt(selIdx),
+      id:selected.id,group:selected.group,name:selected.name,sex:selected.sex,age:selected.age,
+      level:selected.level,
+      otj,podt,br,pl,pres,vyh,
+      score:Math.round(score*100)/100,passed:allPassed,checks
+    };
+    setBaseResults(prev=>{
+      const exists=prev.findIndex(r=>r.athleteIdx===result.athleteIdx);
+      if(exists>=0){const n=[...prev];n[exists]=result;return n}
+      return [...prev,result];
+    });
+    toast("Результат сохранён!");
+    setTimeout(selectNextUnjudged,100);
+  }
+
+  return <div>
+    <div className="card">
+      <div className="form-row">
+        <div className="form-group" style={{flex:2}}>
+          <label>Направление</label>
+          <select value={filter} onChange={e=>{setFilter(e.target.value);setSelIdx("")}}>
+            <option value="all">Все</option><option value="freestyle">Freestyle</option><option value="base">Base</option>
+          </select>
+        </div>
+        <div className="form-group" style={{flex:5}}>
+          <label>Спортсмен</label>
+          <select value={selIdx} onChange={e=>setSelIdx(e.target.value)}>
+            <option value="">— Выберите —</option>
+            {filtered.map(a=><option key={a._idx} value={a._idx} style={judgedIds.has(a._idx)?{color:"#22c55e"}:{}}>
+              {judgedIds.has(a._idx)?"✓ ":""}{a.name} — {a.level} ({a.dir})
+            </option>)}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    {selected&&selected.dir==="freestyle"&&<FreestyleJudging
+      athlete={selected}
+      statika={statika} setStatika={setStatika}
+      dynamika={dynamika} setDynamika={setDynamika}
+      combo={combo} setCombo={setCombo}
+      universality={universality} setUniversality={setUniversality}
+      creative={creative} setCreative={setCreative}
+      dirty={dirty} setDirty={setDirty}
+      fall={fall} setFall={setFall}
+      dsk={dsk} setDsk={setDsk}
+      comboCheck={comboCheck} setComboCheck={setComboCheck}
+      minElCheck={minElCheck} setMinElCheck={setMinElCheck}
+      onSave={saveFreestyle}
+    />}
+
+    {selected&&selected.dir==="base"&&<BaseJudging
+      athlete={selected}
+      otj={otj} setOtj={setOtj}
+      podt={podt} setPodt={setPodt}
+      br={br} setBr={setBr}
+      pl={pl} setPl={setPl}
+      pres={pres} setPres={setPres}
+      vyh={vyh} setVyh={setVyh}
+      onSave={saveBase}
+    />}
+
+    {selected===null&&selIdx===""&&<div className="card"><div className="empty">Выберите спортсмена для судейства</div></div>}
+  </div>;
+}
+
+function FreestyleJudging({athlete,statika,setStatika,dynamika,setDynamika,combo,setCombo,universality,setUniversality,creative,setCreative,dirty,setDirty,fall,setFall,dsk,setDsk,comboCheck,setComboCheck,minElCheck,setMinElCheck,onSave}){
+  const lvl=findLevel(athlete.level);
+  const penalties=dirty*2+fall*4;
+  const total=statika+dynamika+combo+universality+creative-penalties;
+  const minScore=athlete.sex==="ж"?lvl.minF:lvl.minM;
+  const passed=!dsk&&comboCheck&&minElCheck&&total>=minScore;
+
+  return <div className="card">
+    <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:12}}>
+      <div>
+        <h3 style={{color:"#14b8a6"}}>{athlete.name}</h3>
+        <div style={{fontSize:13,color:"#94a3b8",marginTop:4}}>
+          {athlete.level} | <span className={(athlete.sex||"")==="ж"?"badge badge-female":"badge badge-male"}>{(athlete.sex||"?").toUpperCase()}</span> | Мин. баллов: <strong style={{color:"#f59e0b"}}>{minScore}</strong> | Мин. элементов: <strong style={{color:"#f59e0b"}}>{lvl.minEl}</strong>
+        </div>
+      </div>
+    </div>
+
+    <div className="form-row">
+      <div className="form-group"><label>Статика</label><input type="number" step="0.5" min="0" value={statika} onChange={e=>setStatika(parseFloat(e.target.value)||0)}/></div>
+      <div className="form-group"><label>Динамика</label><input type="number" step="0.5" min="0" value={dynamika} onChange={e=>setDynamika(parseFloat(e.target.value)||0)}/></div>
+      <div className="form-group"><label>Комбо бонус</label><input type="number" step="0.1" min="0" value={combo} onChange={e=>setCombo(parseFloat(e.target.value)||0)}/></div>
+    </div>
+    <div className="form-row">
+      <div className="form-group"><label>Универсальность</label><input type="number" step="0.1" min="0" value={universality} onChange={e=>setUniversality(parseFloat(e.target.value)||0)}/></div>
+      <div className="form-group"><label>Креатив</label><input type="number" step="0.5" min="0" value={creative} onChange={e=>setCreative(parseFloat(e.target.value)||0)}/></div>
+    </div>
+
+    <div className="section-title">Штрафы</div>
+    <div className="form-row" style={{alignItems:"center"}}>
+      <div className="form-group">
+        <label>Грязное исполнение (-2)</label>
+        <div className="penalty-ctrl">
+          <button onClick={()=>setDirty(Math.max(0,dirty-1))}>−</button>
+          <span>{dirty}</span>
+          <button onClick={()=>setDirty(dirty+1)}>+</button>
+          <span style={{color:"#ef4444",fontSize:13}}>= −{dirty*2}</span>
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Падение (-4)</label>
+        <div className="penalty-ctrl">
+          <button onClick={()=>setFall(Math.max(0,fall-1))}>−</button>
+          <span>{fall}</span>
+          <button onClick={()=>setFall(fall+1)}>+</button>
+          <span style={{color:"#ef4444",fontSize:13}}>= −{fall*4}</span>
+        </div>
+      </div>
+      <div className="form-group">
+        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+          <input type="checkbox" checked={dsk} onChange={e=>setDsk(e.target.checked)} style={{width:"auto"}}/>
+          ДСК (дисквалификация)
+        </label>
+      </div>
+    </div>
+
+    <div className="section-title">Обязательные условия</div>
+    <div className="form-row" style={{alignItems:"center"}}>
+      <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+        <input type="checkbox" checked={comboCheck} onChange={e=>setComboCheck(e.target.checked)} style={{width:"auto"}}/>
+        Комбо 3+ элементов
+      </label>
+      <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+        <input type="checkbox" checked={minElCheck} onChange={e=>setMinElCheck(e.target.checked)} style={{width:"auto"}}/>
+        Мин. кол. элементов своего разряда
+      </label>
+    </div>
+
+    <div style={{marginTop:16,textAlign:"center"}}>
+      <div className="score-big">{(Math.round(total*100)/100).toFixed(1)}</div>
+      <div style={{fontSize:18,fontWeight:700,marginBottom:12}} className={passed?"result-pass":"result-fail"}>
+        {dsk?"ДИСКВАЛИФИКАЦИЯ":passed?"СДАЛ":"НЕ СДАЛ"}
+      </div>
+      {!dsk&&total<minScore&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>Не хватает баллов: нужно {minScore}, набрано {(Math.round(total*100)/100).toFixed(1)}</div>}
+      {!comboCheck&&<div style={{fontSize:12,color:"#ef4444",marginBottom:4}}>Не выполнено: комбо 3+ элементов</div>}
+      {!minElCheck&&<div style={{fontSize:12,color:"#ef4444",marginBottom:4}}>Не выполнено: мин. кол. элементов</div>}
+      <button className="btn btn-success" onClick={onSave} style={{marginTop:8}}>Сохранить в протокол</button>
+    </div>
+  </div>;
+}
+
+function BaseJudging({athlete,otj,setOtj,podt,setPodt,br,setBr,pl,setPl,pres,setPres,vyh,setVyh,onSave}){
+  const blvl=findBaseLevel(athlete.level);
+  if(!blvl)return <div className="card"><div className="empty">Уровень {athlete.level} не найден в BASE</div></div>;
+
+  const score=otj*BASE_COEF.otj+podt*BASE_COEF.podt+br*BASE_COEF.br+vyh*BASE_COEF.vyh;
+  const checks={
+    otj:blvl.otj===0||otj>=blvl.otj,
+    podt:blvl.podt===0||podt>=blvl.podt,
+    br:blvl.br===0||br>=blvl.br,
+    pl:blvl.pl===0||pl>=blvl.pl,
+    pres:blvl.pres===0||pres>=blvl.pres,
+    vyh:blvl.vyh===0||vyh>=blvl.vyh
+  };
+  const allPassed=Object.values(checks).every(Boolean);
+
+  const exercises=[
+    {label:"Отжимания",val:otj,set:setOtj,norm:blvl.otj,key:"otj"},
+    {label:"Подтягивания",val:podt,set:setPodt,norm:blvl.podt,key:"podt"},
+    {label:"Брусья",val:br,set:setBr,norm:blvl.br,key:"br"},
+    {label:"Планка (сек)",val:pl,set:setPl,norm:blvl.pl,key:"pl"},
+    {label:"Пресс",val:pres,set:setPres,norm:blvl.pres,key:"pres"},
+    {label:"Выходы силой",val:vyh,set:setVyh,norm:blvl.vyh,key:"vyh"},
+  ];
+
+  return <div className="card">
+    <div style={{marginBottom:12}}>
+      <h3 style={{color:"#14b8a6"}}>{athlete.name}</h3>
+      <div style={{fontSize:13,color:"#94a3b8",marginTop:4}}>{athlete.level}</div>
+    </div>
+
+    <div className="form-row" style={{flexWrap:"wrap"}}>
+      {exercises.map(ex=><div className="form-group" key={ex.key} style={{minWidth:140}}>
+        <label>{ex.label} {ex.norm>0&&<span className={checks[ex.key]?"norm-ok":"norm-fail"}>(норм: {ex.norm})</span>}</label>
+        <input type="number" min="0" value={ex.val} onChange={e=>ex.set(parseInt(e.target.value)||0)}
+          style={{borderColor:ex.norm>0?(checks[ex.key]?"#22c55e":"#ef4444"):"#334155"}}
+        />
+      </div>)}
+    </div>
+
+    <div style={{marginTop:16,textAlign:"center"}}>
+      <div style={{fontSize:13,color:"#94a3b8",marginBottom:4}}>Баллы = отж×0.5 + подт×2 + бр×1 + вых×3</div>
+      <div className="score-big">{(Math.round(score*100)/100).toFixed(1)}</div>
+      <div style={{fontSize:18,fontWeight:700,marginBottom:12}} className={allPassed?"result-pass":"result-fail"}>
+        {allPassed?"СДАЛ":"НЕ СДАЛ"}
+      </div>
+      {!allPassed&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>
+        Не выполнены: {exercises.filter(e=>e.norm>0&&!checks[e.key]).map(e=>e.label).join(", ")}
+      </div>}
+      <button className="btn btn-success" onClick={onSave} style={{marginTop:8}}>Сохранить в протокол</button>
+    </div>
+  </div>;
+}
+
+/* ========== TAB 3: PROTOCOL ========== */
+function ProtocolTab({freestyleResults,baseResults}){
+  const sortedF=useMemo(()=>[...freestyleResults].sort((a,b)=>b.total-a.total),[freestyleResults]);
+  const sortedB=useMemo(()=>[...baseResults].sort((a,b)=>b.score-a.score),[baseResults]);
+
+  function exportCsv(){
+    let csv="Направление;№;Гр;ФИО;Уровень;Балл;Результат\n";
+    sortedF.forEach(r=>{csv+=`Freestyle;${r.id};${r.group};${r.name};${r.level};${r.total};${r.passed?"Сдал":"Не сдал"}\n`});
+    sortedB.forEach(r=>{csv+=`Base;${r.id};${r.group};${r.name};${r.level};${r.score};${r.passed?"Сдал":"Не сдал"}\n`});
+    const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download="protocol.csv";a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyText(){
+    let txt="=== FREESTYLE ===\n";
+    sortedF.forEach((r,i)=>{txt+=`${i+1}. ${r.name} (${r.level}) — ${r.total} — ${r.passed?"Сдал":"Не сдал"}\n`});
+    txt+="\n=== BASE ===\n";
+    sortedB.forEach((r,i)=>{txt+=`${i+1}. ${r.name} (${r.level}) — ${r.score} — ${r.passed?"Сдал":"Не сдал"}\n`});
+    navigator.clipboard.writeText(txt);
+  }
+
+  return <div>
+    <div className="section-title">FREESTYLE</div>
+    {sortedF.length===0?<div className="card"><div className="empty">Нет результатов freestyle</div></div>:
+    <div className="card"><div className="table-wrap"><table>
+      <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Стат</th><th>Дин</th><th>Комбо</th><th>Унив</th><th>Креатив</th><th>Штрафы</th><th>Балл</th><th>Результат</th></tr></thead>
+      <tbody>{sortedF.map((r,i)=><tr key={i} className={r.passed?"row-pass":"row-fail"}>
+        <td>{r.id}</td><td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+        <td>{r.statika}</td><td>{r.dynamika}</td><td>{r.combo}</td><td>{r.universality}</td><td>{r.creative}</td>
+        <td style={{color:"#ef4444"}}>{r.penalties>0?`-${r.penalties}`:""}{r.dsk?" ДСК":""}</td>
+        <td style={{fontWeight:700,color:"#f59e0b"}}>{r.total}</td>
+        <td><span className={r.passed?"badge badge-pass":"badge badge-fail"}>{r.passed?"Сдал":"Не сдал"}</span></td>
+      </tr>)}</tbody>
+    </table></div></div>}
+
+    <div className="section-title">БАЗОВЫЕ</div>
+    {sortedB.length===0?<div className="card"><div className="empty">Нет результатов base</div></div>:
+    <div className="card"><div className="table-wrap"><table>
+      <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Отж</th><th>Подт</th><th>Бр</th><th>Планка</th><th>Пресс</th><th>Вых</th><th>Балл</th><th>Результат</th></tr></thead>
+      <tbody>{sortedB.map((r,i)=><tr key={i} className={r.passed?"row-pass":"row-fail"}>
+        <td>{r.id}</td><td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+        <td className={r.checks?.otj?"norm-ok":"norm-fail"}>{r.otj}</td>
+        <td className={r.checks?.podt?"norm-ok":"norm-fail"}>{r.podt}</td>
+        <td className={r.checks?.br?"norm-ok":"norm-fail"}>{r.br}</td>
+        <td className={r.checks?.pl?"norm-ok":"norm-fail"}>{r.pl}</td>
+        <td className={r.checks?.pres?"norm-ok":"norm-fail"}>{r.pres}</td>
+        <td className={r.checks?.vyh?"norm-ok":"norm-fail"}>{r.vyh}</td>
+        <td style={{fontWeight:700,color:"#f59e0b"}}>{r.score}</td>
+        <td><span className={r.passed?"badge badge-pass":"badge badge-fail"}>{r.passed?"Сдал":"Не сдал"}</span></td>
+      </tr>)}</tbody>
+    </table></div></div>}
+
+    <div style={{display:"flex",gap:12,marginTop:16,flexWrap:"wrap"}}>
+      <button className="btn btn-primary" onClick={exportCsv}>Экспорт CSV</button>
+      <button className="btn btn-secondary" onClick={copyText}>Копировать как текст</button>
+    </div>
+  </div>;
+}
+
+/* ========== TAB 4: WINNERS ========== */
+function AgeCatEditor({label,color,cats,setCats}){
+  const [editing,setEditing]=useState(false);
+  const [editCats,setEditCats]=useState([]);
+  function startEdit(){setEditCats(cats.map(c=>({...c})));setEditing(true)}
+  function saveEdit(){setCats(editCats.filter(c=>c.name.trim()));setEditing(false)}
+  function addCat(){setEditCats([...editCats,{name:"",min:0,max:99}])}
+  function removeCat(i){setEditCats(editCats.filter((_,j)=>j!==i))}
+  function updateCat(i,field,val){const n=[...editCats];n[i]={...n[i],[field]:field==="name"?val:parseInt(val)||0};setEditCats(n)}
+  return <div className="card">
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <h3 style={{color}}>{label}</h3>
+      {!editing?<button className="btn btn-secondary btn-sm" onClick={startEdit}>Настроить</button>
+      :<button className="btn btn-primary btn-sm" onClick={saveEdit}>Сохранить</button>}
+    </div>
+    {editing?<div>
+      {editCats.map((c,i)=><div className="age-cat-row" key={i}>
+        <input className="cat-name" type="text" value={c.name} onChange={e=>updateCat(i,"name",e.target.value)} placeholder="Название"/>
+        <input type="number" value={c.min} onChange={e=>updateCat(i,"min",e.target.value)} placeholder="Мин"/>
+        <span style={{color:"#64748b"}}>—</span>
+        <input type="number" value={c.max} onChange={e=>updateCat(i,"max",e.target.value)} placeholder="Макс"/>
+        <button className="btn btn-danger btn-sm" onClick={()=>removeCat(i)}>×</button>
+      </div>)}
+      <button className="btn btn-secondary btn-sm" onClick={addCat} style={{marginTop:8}}>+ Категория</button>
+    </div>
+    :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      {cats.map((c,i)=><span key={i} className="badge" style={{background:color+"22",color}}>{c.name} ({c.min}–{c.max})</span>)}
+    </div>}
+  </div>;
+}
+
+function WinnersTab({freestyleResults,baseResults,ageCatsF,setAgeCatsF,ageCatsB,setAgeCatsB}){
+  const passedF=useMemo(()=>freestyleResults.filter(r=>r.passed).sort((a,b)=>b.total-a.total),[freestyleResults]);
+  const passedB=useMemo(()=>baseResults.filter(r=>r.passed).sort((a,b)=>b.score-a.score),[baseResults]);
+
+  function getWinners(results,cats){
+    return cats.map(cat=>{
+      const inCat=results.filter(r=>r.age>=cat.min&&r.age<=cat.max);
+      return {cat,winners:inCat.slice(0,3)};
+    }).filter(g=>g.winners.length>0);
+  }
+
+  const fWinners=getWinners(passedF,ageCatsF);
+  const bWinners=getWinners(passedB,ageCatsB);
+
+  return <div>
+    <AgeCatEditor label="Категории Фристайл" color="#14b8a6" cats={ageCatsF} setCats={setAgeCatsF}/>
+    <AgeCatEditor label="Категории База" color="#f59e0b" cats={ageCatsB} setCats={setAgeCatsB}/>
+
+    <div className="section-title">ПОБЕДИТЕЛИ ФРИСТАЙЛ</div>
+    {fWinners.length===0?<div className="card"><div className="empty">Нет сдавших freestyle</div></div>:
+    fWinners.map((g,gi)=><div className="card" key={gi}>
+      <h4 style={{marginBottom:8,color:"#14b8a6"}}>{g.cat.name} лет</h4>
+      <div className="table-wrap"><table>
+        <thead><tr><th>Место</th><th>Гр</th><th>ФИО</th><th>Лет</th><th>Баллы</th></tr></thead>
+        <tbody>{g.winners.map((w,i)=><tr key={i}>
+          <td style={{fontWeight:700,color:i===0?"#f59e0b":i===1?"#94a3b8":"#cd7f32"}}>{i+1}</td>
+          <td>{w.group}</td><td>{w.name}</td><td>{w.age}</td>
+          <td style={{fontWeight:700,color:"#f59e0b"}}>{w.total}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </div>)}
+
+    <div className="section-title">ПОБЕДИТЕЛИ БАЗА</div>
+    {bWinners.length===0?<div className="card"><div className="empty">Нет сдавших base</div></div>:
+    bWinners.map((g,gi)=><div className="card" key={gi}>
+      <h4 style={{marginBottom:8,color:"#f59e0b"}}>{g.cat.name} лет</h4>
+      <div className="table-wrap"><table>
+        <thead><tr><th>Место</th><th>Гр</th><th>ФИО</th><th>Лет</th><th>Баллы</th></tr></thead>
+        <tbody>{g.winners.map((w,i)=><tr key={i}>
+          <td style={{fontWeight:700,color:i===0?"#f59e0b":i===1?"#94a3b8":"#cd7f32"}}>{i+1}</td>
+          <td>{w.group}</td><td>{w.name}</td><td>{w.age}</td>
+          <td style={{fontWeight:700,color:"#f59e0b"}}>{w.score}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </div>)}
+  </div>;
+}
+
+/* ========== TAB 5: CERTIFICATES ========== */
+function CertsTab({freestyleResults,baseResults}){
+  const fPassed=useMemo(()=>freestyleResults.filter(r=>r.passed).sort((a,b)=>b.total-a.total),[freestyleResults]);
+  const fFailed=useMemo(()=>freestyleResults.filter(r=>!r.passed),[freestyleResults]);
+  const bPassed=useMemo(()=>baseResults.filter(r=>r.passed).sort((a,b)=>b.score-a.score),[baseResults]);
+  const bFailed=useMemo(()=>baseResults.filter(r=>!r.passed),[baseResults]);
+
+  function copyList(items,type){
+    let txt="";
+    items.forEach(r=>{
+      if(type==="f-pass")txt+=`${r.group}\t${r.name}\t${r.level}\t${r.total}\tРазряд присвоен\n`;
+      else if(type==="f-fail")txt+=`${r.group}\t${r.name}\t${r.level}\tГрамота за участие\n`;
+      else if(type==="b-pass")txt+=`${r.group}\t${r.name}\t${r.level}\t${r.score}\tРазряд присвоен\n`;
+      else if(type==="b-fail")txt+=`${r.group}\t${r.name}\t${r.level}\tГрамота за участие\n`;
+    });
+    navigator.clipboard.writeText(txt);
+  }
+
+  return <div>
+    <div className="section-title">FREESTYLE</div>
+
+    <div className="card">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h4 style={{color:"#22c55e"}}>СДАЛИ ({fPassed.length})</h4>
+        {fPassed.length>0&&<button className="btn btn-secondary btn-sm" onClick={()=>copyList(fPassed,"f-pass")}>Копировать список</button>}
+      </div>
+      {fPassed.length===0?<div className="empty">—</div>:
+      <div className="table-wrap"><table>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Баллы</th><th>Статус</th></tr></thead>
+        <tbody>{fPassed.map((r,i)=><tr key={i}>
+          <td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+          <td style={{color:"#f59e0b",fontWeight:700}}>{r.total}</td>
+          <td><span className="badge badge-pass">Разряд присвоен</span></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>
+
+    <div className="card">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h4 style={{color:"#ef4444"}}>НЕ СДАЛИ / УЧАСТИЕ ({fFailed.length})</h4>
+        {fFailed.length>0&&<button className="btn btn-secondary btn-sm" onClick={()=>copyList(fFailed,"f-fail")}>Копировать список</button>}
+      </div>
+      {fFailed.length===0?<div className="empty">—</div>:
+      <div className="table-wrap"><table>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень заявки</th><th>Статус</th></tr></thead>
+        <tbody>{fFailed.map((r,i)=><tr key={i}>
+          <td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+          <td><span className="badge" style={{background:"#94a3b822",color:"#94a3b8"}}>Грамота за участие</span></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>
+
+    <div className="section-title">БАЗОВЫЕ</div>
+
+    <div className="card">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h4 style={{color:"#22c55e"}}>СДАЛИ ({bPassed.length})</h4>
+        {bPassed.length>0&&<button className="btn btn-secondary btn-sm" onClick={()=>copyList(bPassed,"b-pass")}>Копировать список</button>}
+      </div>
+      {bPassed.length===0?<div className="empty">—</div>:
+      <div className="table-wrap"><table>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Баллы</th><th>Статус</th></tr></thead>
+        <tbody>{bPassed.map((r,i)=><tr key={i}>
+          <td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+          <td style={{color:"#f59e0b",fontWeight:700}}>{r.score}</td>
+          <td><span className="badge badge-pass">Разряд присвоен</span></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>
+
+    <div className="card">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h4 style={{color:"#ef4444"}}>НЕ СДАЛИ / УЧАСТИЕ ({bFailed.length})</h4>
+        {bFailed.length>0&&<button className="btn btn-secondary btn-sm" onClick={()=>copyList(bFailed,"b-fail")}>Копировать список</button>}
+      </div>
+      {bFailed.length===0?<div className="empty">—</div>:
+      <div className="table-wrap"><table>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень заявки</th><th>Статус</th></tr></thead>
+        <tbody>{bFailed.map((r,i)=><tr key={i}>
+          <td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+          <td><span className="badge" style={{background:"#94a3b822",color:"#94a3b8"}}>Грамота за участие</span></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>
+  </div>;
+}
+
+/* ========== APP ========== */
+function App(){
+  const [tab,setTab]=useState(0);
+  const [athletes,setAthletes]=useState(()=>loadLS("comp_athletes",[]));
+  const [freestyleResults,setFreestyleResults]=useState(()=>loadLS("comp_freestyle_results",[]));
+  const [baseResults,setBaseResults]=useState(()=>loadLS("comp_base_results",[]));
+  const [ageCatsF,setAgeCatsF]=useState(()=>loadLS("comp_age_categories_freestyle",DEFAULT_AGE_CATS));
+  const [ageCatsB,setAgeCatsB]=useState(()=>loadLS("comp_age_categories_base",DEFAULT_AGE_CATS));
+  const [toastMsg,setToastMsg]=useState("");
+
+  useEffect(()=>saveLS("comp_athletes",athletes),[athletes]);
+  useEffect(()=>saveLS("comp_freestyle_results",freestyleResults),[freestyleResults]);
+  useEffect(()=>saveLS("comp_base_results",baseResults),[baseResults]);
+  useEffect(()=>saveLS("comp_age_categories_freestyle",ageCatsF),[ageCatsF]);
+  useEffect(()=>saveLS("comp_age_categories_base",ageCatsB),[ageCatsB]);
+
+  const showToast=useCallback((msg)=>setToastMsg(msg),[]);
+
+  return <>
+    <div className="header">
+      <h1>WU Протокол Соревнований</h1>
+      <a href="index.html">&larr; Калькулятор</a>
+    </div>
+
+    <div className="tabs">
+      {TAB_NAMES.map((name,i)=><button key={i} className={tab===i?"active":""} onClick={()=>setTab(i)}>{name}</button>)}
+    </div>
+
+    <div className="container">
+      {tab===0&&<AthletesTab athletes={athletes} setAthletes={setAthletes}/>}
+      {tab===1&&<JudgingTab athletes={athletes} freestyleResults={freestyleResults} setFreestyleResults={setFreestyleResults} baseResults={baseResults} setBaseResults={setBaseResults} toast={showToast}/>}
+      {tab===2&&<ProtocolTab freestyleResults={freestyleResults} baseResults={baseResults}/>}
+      {tab===3&&<WinnersTab freestyleResults={freestyleResults} baseResults={baseResults} ageCatsF={ageCatsF} setAgeCatsF={setAgeCatsF} ageCatsB={ageCatsB} setAgeCatsB={setAgeCatsB}/>}
+      {tab===4&&<CertsTab freestyleResults={freestyleResults} baseResults={baseResults}/>}
+    </div>
+
+    <div className="footer">Калькулятор для спортсменов &rarr; <a href="index.html">index.html</a></div>
+
+    {toastMsg&&<Toast msg={toastMsg} onDone={()=>setToastMsg("")}/>}
+  </>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
