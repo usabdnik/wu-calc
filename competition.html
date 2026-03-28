@@ -1049,11 +1049,12 @@ function CreateEventDialog({syncManager,onCreate,onClose}){
   const[name,setName]=useState('');
   const[date,setDate]=useState(new Date().toISOString().slice(0,10));
   const[loading,setLoading]=useState(false);
+  const[error,setError]=useState(null);
   async function handleCreate(){
     if(!name.trim())return;
-    setLoading(true);
+    setLoading(true);setError(null);
     try{const evt=await syncManager.createEvent(name,date);onCreate(evt);}
-    catch(e){setLoading(false);return;}
+    catch(e){setError(e.message);setLoading(false);return;}
     setLoading(false);
   }
   return <div className="confirm-overlay" onClick={onClose}>
@@ -1065,6 +1066,7 @@ function CreateEventDialog({syncManager,onCreate,onClose}){
       <div className="form-group" style={{marginTop:8}}><label>Дата</label>
         <input type="date" value={date} onChange={e=>setDate(e.target.value)}/>
       </div>
+      {error&&<div style={{color:'#ef4444',marginTop:8,fontSize:13}}>Ошибка: {error}</div>}
       <div className="btn-row" style={{marginTop:12}}>
         <button className="btn btn-primary" onClick={handleCreate} disabled={loading}>{loading?'Создание...':'Создать'}</button>
         <button className="btn btn-secondary" onClick={onClose}>Отмена</button>
