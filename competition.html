@@ -953,8 +953,7 @@ class SyncManager {
     return(await res.json()).events;
   }
   async createEvent(name,date){
-    const id=`${date}-${name.toLowerCase().replace(/[^a-zа-яё0-9]+/gi,'-').replace(/^-|-$/g,'')}`;
-    const res=await fetch(`${this.API_BASE}/events`,{method:'POST',headers:this._headers(),body:JSON.stringify({id,name,date})});
+    const res=await fetch(`${this.API_BASE}/events`,{method:'POST',headers:this._headers(),body:JSON.stringify({name,date})});
     if(!res.ok)throw new Error(`Event create failed: ${res.status}`);
     return await res.json();
   }
