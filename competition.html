@@ -91,6 +91,17 @@ tr:hover{background:#ffffff08}
 .confirm-box p{margin-bottom:16px;font-size:15px}
 .confirm-box .btn-row{display:flex;gap:12px;justify-content:center}
 
+/* ── Sync bar ── */
+.sync-bar{display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap}
+.sync-event-badge{font-size:12px;color:#94a3b8;background:#1e293b;padding:4px 10px;border-radius:12px;cursor:pointer;border:1px solid #334155;white-space:nowrap}
+.sync-event-badge:hover{border-color:#14b8a6;color:#14b8a6}
+.sync-btn{font-size:13px}
+.sync-btn-idle{background:#334155;color:#e2e8f0}
+.sync-btn-syncing{background:#1e40af;color:#fff;cursor:wait}
+.sync-btn-error{background:#dc2626;color:#fff}
+.sync-indicator{font-size:11px}
+.event-item:hover{border-color:#14b8a6 !important;background:#0f172a !important}
+
 @media(max-width:480px){
   .tabs button{font-size:11px;padding:8px 4px}
   .container{padding:10px}
@@ -130,6 +141,8 @@ const LEVELS=[
 const FREESTYLE_LEVELS=LEVELS;
 
 const BASE_LEVELS=[
+{name:"SPIRIT 1 Biginner",otj:5,podt:0,br:0,pl:0,pres:0,vyh:0},
+{name:"SPIRIT 1 Diligent",otj:10,podt:1,br:0,pl:0,pres:0,vyh:0},
 {name:"BASE 2",otj:20,podt:5,br:10,pl:0,pres:0,vyh:0},
 {name:"BASE 3",otj:30,podt:10,br:20,pl:4,pres:3,vyh:0},
 {name:"BASE 4",otj:40,podt:15,br:30,pl:4,pres:6,vyh:0},
@@ -180,16 +193,12 @@ const DEMO_FREESTYLE=[
 {athleteIdx:0,id:"100006",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 3",statika:18,dynamika:40,combo:2.2,universality:0.5,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:60.7,passed:true},
 {athleteIdx:1,id:"100009",group:"М-217",name:"Байгозин Константин Николаевич",sex:"м",age:14,level:"SPIRIT 2",statika:18,dynamika:20,combo:1,universality:1.5,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:40.5,passed:true},
 {athleteIdx:2,id:"100016",group:"М-217",name:"Хорин Данил Денисович",sex:"м",age:9,level:"SPIRIT 2",statika:17,dynamika:8,combo:0.5,universality:0.9,creative:0,dirty:1,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:2,total:24.4,passed:true},
-{athleteIdx:3,id:"100020",group:"A-219",name:"Колеватов Иван Романович",sex:"м",age:14,level:"SPIRIT 1 Prepared",statika:14,dynamika:10,combo:0,universality:0.5,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:24.5,passed:true},
 {athleteIdx:4,id:"100023",group:"М-117",name:"Стерхов Илья Андреевич",sex:"м",age:15,level:"SPIRIT 4",statika:40,dynamika:19,combo:0,universality:3,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:62,passed:true},
-{athleteIdx:5,id:"100036",group:"М-19",name:"Тумбаков Арсентий Николаевич",sex:"м",age:14,level:"SPIRIT 1 Prepared",statika:6,dynamika:20,combo:1,universality:0,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:27,passed:true},
 {athleteIdx:6,id:"100035",group:"М-117",name:"Касаткин Ярослав Павлович",sex:"м",age:17,level:"SPIRIT 5",statika:50,dynamika:40,combo:3,universality:6,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:99,passed:true},
-{athleteIdx:7,id:"100012",group:"М-118",name:"Чумаков Дмитрий Васильевич",sex:"м",age:9,level:"SPIRIT 1 Prepared",statika:15,dynamika:14,combo:1,universality:1,creative:0,dirty:2,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:4,total:27,passed:true},
 {athleteIdx:8,id:"100040",group:"М-117",name:"Кулаков Кирилл Никитич",sex:"м",age:11,level:"SPIRIT 3",statika:20,dynamika:38,combo:2,universality:0.8,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:60.8,passed:true},
 {athleteIdx:9,id:"100041",group:"М-117",name:"Клементьев Илья Андреевич",sex:"м",age:11,level:"SPIRIT 3",statika:22,dynamika:35,combo:2,universality:1,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:60,passed:true},
 {athleteIdx:10,id:"100042",group:"М-118",name:"Скобелев Дамир Алексеевич",sex:"м",age:11,level:"SPIRIT 3",statika:20,dynamika:36,combo:1.4,universality:1,creative:0,dirty:0,fall:0,dsk:false,comboCheck:true,minElCheck:true,penalties:0,total:58.4,passed:true},
-{athleteIdx:17,id:"100043",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 3",statika:10,dynamika:20,combo:1,universality:0,creative:0,dirty:1,fall:0,dsk:false,comboCheck:true,minElCheck:false,penalties:2,total:29,passed:false},
-{athleteIdx:18,id:"100055",group:"М-117",name:"Попков Константин Сергеевич",sex:"м",age:13,level:"SPIRIT 1 Prepared",statika:5,dynamika:8,combo:0,universality:0,creative:0,dirty:0,fall:1,dsk:false,comboCheck:false,minElCheck:false,penalties:4,total:9,passed:false}
+{athleteIdx:17,id:"100043",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 3",statika:10,dynamika:20,combo:1,universality:0,creative:0,dirty:1,fall:0,dsk:false,comboCheck:true,minElCheck:false,penalties:2,total:29,passed:false}
 ];
 
 // Demo base results — fields match saveBase() output
@@ -216,8 +225,20 @@ initDemo();
 /* ========== HELPERS ========== */
 function loadLS(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def}catch{return def}}
 function saveLS(key,val){localStorage.setItem(key,JSON.stringify(val))}
+function saveLSTracked(key,val,syncMgr){
+  saveLS(key,val);
+  if(!syncMgr)return;
+  const typeMap={'comp_athletes':'athletes','comp_freestyle_results':'freestyle_results','comp_base_results':'base_results','comp_age_categories_freestyle':'age_categories_freestyle','comp_age_categories_base':'age_categories_base'};
+  const recordType=typeMap[key];
+  if(!recordType)return;
+  for(const item of val){
+    const recordKey=syncMgr._getRecordKey(item,recordType);
+    syncMgr.updateTimestamp(recordType,recordKey);
+  }
+}
 function findLevel(name){return LEVELS.find(l=>l.name===name)}
 function findBaseLevel(name){return BASE_LEVELS.find(l=>l.name===name)}
+function getDirForLevel(level){if(!level)return"freestyle";if(level.startsWith("BASE"))return"base";if(level==="SPIRIT 1 Biginner"||level==="SPIRIT 1 Diligent")return"base";return"freestyle"}
 
 /* ========== TOAST ========== */
 function Toast({msg,onDone}){
@@ -239,10 +260,11 @@ function ConfirmDialog({msg,onYes,onNo}){
 }
 
 /* ========== TAB 1: ATHLETES ========== */
-function AthletesTab({athletes,setAthletes}){
+function AthletesTab({athletes,setAthletes,clearResults}){
   const [csv,setCsv]=useState("");
-  const [form,setForm]=useState({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"freestyle"});
+  const [form,setForm]=useState({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"base"});
   const [confirm,setConfirm]=useState(false);
+  const [confirmKtren,setConfirmKtren]=useState(false);
 
   const allLevelNames=[...LEVELS.map(l=>l.name),...BASE_LEVELS.map(l=>l.name)];
 
@@ -250,29 +272,30 @@ function AthletesTab({athletes,setAthletes}){
     {id:"5029272",group:"М-118",name:"Чумаков Дмитрий Васильевич",sex:"м",age:9,level:"SPIRIT 2",dir:"freestyle"},
     {id:"8195019",group:"А-29",name:"Утробин Артём Павлович",sex:"м",age:13,level:"SPIRIT 1 Prepared",dir:"freestyle"},
     {id:"2692686",group:"А-219",name:"Вежеев Андрей Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"9618048",group:"А-218",name:"Веселов Роман Александрович",sex:"м",age:9,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"9618048",group:"А-218",name:"Веселов Роман Александрович",sex:"м",age:9,level:"SPIRIT 1 Biginner",dir:"base"},
     {id:"8812813",group:"А-218",name:"Мотошков Антон Александрович",sex:"м",age:15,level:"SPIRIT 1 Prepared",dir:"freestyle"},
     {id:"6720865",group:"М-117",name:"Осеев Арсений Александрович",sex:"м",age:16,level:"SPIRIT 3",dir:"freestyle"},
     {id:"8856479",group:"М-118",name:"Попков Константин",sex:"м",age:9,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"8675768",group:"М-118",name:"Красноперов Михаил Евгеньевич",sex:"м",age:10,level:"SPIRIT 1 Biginner",dir:"freestyle"},
-    {id:"1555503",group:"М-117",name:"Логинов Андрей Сергеевич",sex:"м",age:16,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"8675768",group:"М-118",name:"Красноперов Михаил Евгеньевич",sex:"м",age:10,level:"SPIRIT 1 Biginner",dir:"base"},
+    {id:"1555503",group:"М-117",name:"Логинов Андрей Сергеевич",sex:"м",age:16,level:"SPIRIT 1 Biginner",dir:"base"},
     {id:"3465559",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 2",dir:"freestyle"},
     {id:"9465379",group:"М-117",name:"Загвоздкин Роман",sex:"м",age:11,level:"SPIRIT 1 Prepared",dir:"freestyle"},
     {id:"1216737",group:"М-117",name:"Стерхов Илья Андреевич",sex:"м",age:16,level:"SPIRIT 4",dir:"freestyle"},
     {id:"6796134",group:"А-219",name:"Желудов Михаил Григорьевич",sex:"м",age:13,level:"SPIRIT 3",dir:"freestyle"},
-    {id:"2994490",group:"А-218",name:"Вахрушев Савелий Александрович",sex:"м",age:10,level:"SPIRIT 1 Diligent",dir:"freestyle"},
+    {id:"2994490",group:"А-218",name:"Вахрушев Савелий Александрович",sex:"м",age:10,level:"SPIRIT 1 Diligent",dir:"base"},
     {id:"6700110",group:"М-117",name:"Тарасов Лев Владимирович",sex:"м",age:16,level:"SPIRIT 2",dir:"freestyle"},
     {id:"3463774",group:"М-19",name:"Байгозин Константин Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
     {id:"8727201",group:"А-218",name:"Внукова Софья Дмитриевна",sex:"ж",age:8,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"6591704",group:"А-29",name:"Михеев Михаил Владимирович",sex:"м",age:13,level:"SPIRIT 1 Diligent",dir:"freestyle"},
+    {id:"6591704",group:"А-29",name:"Михеев Михаил Владимирович",sex:"м",age:13,level:"SPIRIT 1 Diligent",dir:"base"},
     {id:"2287600",group:"М-19",name:"Дулесов Максим Антонович",sex:"м",age:13,level:"BASE 3",dir:"base"},
     {id:"4131799",group:"А-219",name:"Колеватов Иван Романович",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
     {id:"2516131",group:"М-117",name:"Кулаков Кирилл Никитич",sex:"м",age:11,level:"SPIRIT 3",dir:"freestyle"},
-    {id:"4251838",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"4251838",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 1 Biginner",dir:"base"},
     {id:"8939040",group:"А-219",name:"Новосёлов Дмитрий",sex:"м",age:13,level:"SPIRIT 2",dir:"freestyle"}
   ];
 
-  function loadKtren(){setAthletes(KTREN_20260328);}
+  function loadKtren(){setConfirmKtren(true)}
+  function doLoadKtren(){setAthletes(KTREN_20260328);clearResults();setConfirmKtren(false)}
 
   function importCsv(){
     if(!csv.trim())return;
@@ -294,7 +317,7 @@ function AthletesTab({athletes,setAthletes}){
     if(!form.name.trim())return;
     const a={...form,id:form.id||String(Date.now()),age:parseInt(form.age)||0,sex:form.sex.toLowerCase(),dir:form.dir.toLowerCase()};
     setAthletes(prev=>[...prev,a]);
-    setForm({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"freestyle"});
+    setForm({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"base"});
   }
 
   const [editIdx,setEditIdx]=useState(null);
@@ -332,7 +355,7 @@ function AthletesTab({athletes,setAthletes}){
         </div>
         <div className="form-group"><label>Возраст</label><input type="number" value={form.age} onChange={e=>setForm({...form,age:e.target.value})} min="0"/></div>
         <div className="form-group"><label>Уровень</label>
-          <select value={form.level} onChange={e=>setForm({...form,level:e.target.value})}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select>
+          <select value={form.level} onChange={e=>{const lv=e.target.value;setForm({...form,level:lv,dir:getDirForLevel(lv)})}}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select>
         </div>
         <div className="form-group"><label>Направление</label>
           <select value={form.dir} onChange={e=>setForm({...form,dir:e.target.value})}><option value="freestyle">Freestyle</option><option value="base">Base</option></select>
@@ -355,7 +378,7 @@ function AthletesTab({athletes,setAthletes}){
           <td><input style={{width:"100%",padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.name} onChange={e=>setEditData({...editData,name:e.target.value})}/></td>
           <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.sex} onChange={e=>setEditData({...editData,sex:e.target.value})}><option value="м">М</option><option value="ж">Ж</option></select></td>
           <td><input type="number" style={{width:45,padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.age} onChange={e=>setEditData({...editData,age:e.target.value})}/></td>
-          <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.level} onChange={e=>setEditData({...editData,level:e.target.value})}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select></td>
+          <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.level} onChange={e=>{const lv=e.target.value;setEditData({...editData,level:lv,dir:getDirForLevel(lv)})}}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select></td>
           <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.dir} onChange={e=>setEditData({...editData,dir:e.target.value})}><option value="freestyle">freestyle</option><option value="base">base</option></select></td>
           <td style={{whiteSpace:"nowrap"}}><button className="btn btn-primary btn-sm" onClick={saveEdit}>✓</button>{" "}<button className="btn btn-secondary btn-sm" onClick={cancelEdit}>✕</button></td>
         </tr>:<tr key={i}>
@@ -367,7 +390,8 @@ function AthletesTab({athletes,setAthletes}){
       </table></div>}
     </div>
 
-    {confirm&&<ConfirmDialog msg="Удалить всех участников?" onYes={()=>{setAthletes([]);setConfirm(false)}} onNo={()=>setConfirm(false)}/>}
+    {confirm&&<ConfirmDialog msg="Удалить всех участников?" onYes={()=>{setAthletes([]);clearResults();setConfirm(false)}} onNo={()=>setConfirm(false)}/>}
+    {confirmKtren&&<ConfirmDialog msg="Загрузить К трен 28/03/26? Текущие участники и результаты будут сброшены." onYes={doLoadKtren} onNo={()=>setConfirmKtren(false)}/>}
   </div>;
 }
 
@@ -887,6 +911,275 @@ function CertsTab({freestyleResults,baseResults}){
   </div>;
 }
 
+/* ========== SYNC MANAGER ========== */
+class SyncManager {
+  constructor(){
+    this.API_BASE='https://api.workoutudm.ru/api/competition';
+    this.deviceId=this._getOrCreateDeviceId();
+    this.meta=this._loadMeta();
+    this.timestamps=this._loadTimestamps();
+  }
+  _getOrCreateDeviceId(){
+    let id=localStorage.getItem('comp_device_id');
+    if(!id){id=crypto.randomUUID();localStorage.setItem('comp_device_id',id);}
+    return id;
+  }
+  _loadMeta(){return JSON.parse(localStorage.getItem('comp_sync_meta')||'null');}
+  _saveMeta(meta){this.meta=meta;localStorage.setItem('comp_sync_meta',JSON.stringify(meta));}
+  _loadTimestamps(){return JSON.parse(localStorage.getItem('comp_sync_timestamps')||'{}');}
+  _saveTimestamps(){localStorage.setItem('comp_sync_timestamps',JSON.stringify(this.timestamps));}
+  _headers(){return{'Content-Type':'application/json','X-API-Key':this._getApiKey()};}
+  _getApiKey(){try{const cfg=JSON.parse(localStorage.getItem('wu-ai')||'{}');return cfg.key||'';}catch{return '';}}
+  _getRecordKey(record,recordType){
+    if(recordType==='age_categories_freestyle'||recordType==='age_categories_base')return record.name;
+    return record.id;
+  }
+  _keyForType(recordType){
+    const map={'athletes':'comp_athletes','freestyle_results':'comp_freestyle_results','base_results':'comp_base_results','age_categories_freestyle':'comp_age_categories_freestyle','age_categories_base':'comp_age_categories_base'};
+    return map[recordType];
+  }
+  updateTimestamp(recordType,recordKey){
+    this.timestamps[`${recordType}:${recordKey}`]=new Date().toISOString();
+    this._saveTimestamps();
+  }
+  getTimestamp(recordType,recordKey){return this.timestamps[`${recordType}:${recordKey}`]||null;}
+  get eventId(){return this.meta?.event_id||null;}
+  get lastSyncAt(){return this.meta?.last_sync_at||null;}
+  get isConfigured(){return !!this.eventId;}
+  setEventId(eventId){this._saveMeta({...this.meta,event_id:eventId,last_sync_at:null});}
+  async fetchEvents(){
+    const res=await fetch(`${this.API_BASE}/events`,{headers:this._headers()});
+    if(!res.ok)throw new Error(`Events fetch failed: ${res.status}`);
+    return(await res.json()).events;
+  }
+  async createEvent(name,date){
+    const id=`${date}-${name.toLowerCase().replace(/[^a-zа-яё0-9]+/gi,'-').replace(/^-|-$/g,'')}`;
+    const res=await fetch(`${this.API_BASE}/events`,{method:'POST',headers:this._headers(),body:JSON.stringify({id,name,date})});
+    if(!res.ok)throw new Error(`Event create failed: ${res.status}`);
+    return await res.json();
+  }
+  async preview(){
+    if(!this.eventId)throw new Error('No event selected');
+    const res=await fetch(`${this.API_BASE}/sync/preview?event_id=${encodeURIComponent(this.eventId)}`,{headers:this._headers()});
+    if(!res.ok)throw new Error(`Preview failed: ${res.status}`);
+    return await res.json();
+  }
+  async sync(currentData){
+    if(!this.eventId)throw new Error('No event selected');
+    const records=this._collectRecords(currentData);
+    const res=await fetch(`${this.API_BASE}/sync`,{method:'POST',headers:this._headers(),body:JSON.stringify({event_id:this.eventId,device_id:this.deviceId,since:this.lastSyncAt,records})});
+    if(!res.ok)throw new Error(`Sync failed: ${res.status}`);
+    const result=await res.json();
+    this._saveMeta({...this.meta,last_sync_at:result.server_time});
+    return result;
+  }
+  async pullOnly(){
+    if(!this.eventId)throw new Error('No event selected');
+    const since=this.lastSyncAt||'1970-01-01T00:00:00Z';
+    const res=await fetch(`${this.API_BASE}/sync?event_id=${encodeURIComponent(this.eventId)}&since=${encodeURIComponent(since)}`,{headers:this._headers()});
+    if(!res.ok)throw new Error(`Pull failed: ${res.status}`);
+    return await res.json();
+  }
+  _collectRecords(data){
+    const records=[];
+    const typeMap={athletes:data.athletes,freestyle_results:data.freestyleResults,base_results:data.baseResults,age_categories_freestyle:data.ageCatsF,age_categories_base:data.ageCatsB};
+    for(const[recordType,items]of Object.entries(typeMap)){
+      for(const item of items){
+        const recordKey=this._getRecordKey(item,recordType);
+        records.push({record_type:recordType,record_key:recordKey,data:item,updated_at:this.getTimestamp(recordType,recordKey)||new Date().toISOString()});
+      }
+    }
+    return records;
+  }
+  mergeRecords(pulledRecords,currentData){
+    const result={athletes:[...currentData.athletes],freestyleResults:[...currentData.freestyleResults],baseResults:[...currentData.baseResults],ageCatsF:[...currentData.ageCatsF],ageCatsB:[...currentData.ageCatsB]};
+    const stats={added:0,updated:0,deleted:0};
+    for(const sr of pulledRecords){
+      const stateKey=this._stateKeyForType(sr.record_type);
+      const arr=result[stateKey];
+      const localIdx=arr.findIndex(r=>this._getRecordKey(r,sr.record_type)===sr.record_key);
+      if(sr.deleted){if(localIdx>=0){arr.splice(localIdx,1);stats.deleted++;}}
+      else if(localIdx<0){arr.push(sr.data);stats.added++;}
+      else{arr[localIdx]=sr.data;stats.updated++;}
+      this.timestamps[`${sr.record_type}:${sr.record_key}`]=sr.updated_at;
+    }
+    this._saveTimestamps();
+    this._recalcAthleteIdx(result.athletes,result.freestyleResults);
+    this._recalcAthleteIdx(result.athletes,result.baseResults);
+    return{...result,stats};
+  }
+  _stateKeyForType(recordType){
+    const map={'athletes':'athletes','freestyle_results':'freestyleResults','base_results':'baseResults','age_categories_freestyle':'ageCatsF','age_categories_base':'ageCatsB'};
+    return map[recordType];
+  }
+  _recalcAthleteIdx(athletes,results){
+    for(const r of results){const idx=athletes.findIndex(a=>a.id===r.id);if(idx>=0)r.athleteIdx=idx;}
+  }
+}
+
+/* ========== SYNC UI COMPONENTS ========== */
+function EventSelector({syncManager,onSelect,onClose,onCreateNew}){
+  const[events,setEvents]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState(null);
+  useEffect(()=>{
+    syncManager.fetchEvents().then(e=>{setEvents(e);setLoading(false);}).catch(e=>{setError(e.message);setLoading(false);});
+  },[]);
+  return <div className="confirm-overlay" onClick={onClose}>
+    <div className="confirm-box" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+      <h3 style={{color:'#14b8a6',marginBottom:12}}>Выберите соревнование</h3>
+      {loading&&<div className="empty">Загрузка...</div>}
+      {error&&<div style={{color:'#ef4444'}}>Ошибка: {error}</div>}
+      {events.map(evt=>(
+        <div key={evt.id} className="event-item" onClick={()=>onSelect(evt.id)}
+          style={{padding:'10px 12px',cursor:'pointer',borderRadius:8,marginBottom:6,background:'#1e293b',border:'1px solid #334155'}}>
+          <div style={{fontWeight:600}}>{evt.name}</div>
+          <div style={{fontSize:12,color:'#94a3b8'}}>{evt.date} | {evt.status}</div>
+        </div>
+      ))}
+      <div className="btn-row" style={{marginTop:12}}>
+        <button className="btn btn-primary" onClick={onCreateNew}>+ Новое событие</button>
+        <button className="btn btn-secondary" onClick={onClose}>Отмена</button>
+      </div>
+    </div>
+  </div>;
+}
+
+function CreateEventDialog({syncManager,onCreate,onClose}){
+  const[name,setName]=useState('');
+  const[date,setDate]=useState(new Date().toISOString().slice(0,10));
+  const[loading,setLoading]=useState(false);
+  async function handleCreate(){
+    if(!name.trim())return;
+    setLoading(true);
+    try{const evt=await syncManager.createEvent(name,date);onCreate(evt);}
+    catch(e){setLoading(false);return;}
+    setLoading(false);
+  }
+  return <div className="confirm-overlay" onClick={onClose}>
+    <div className="confirm-box" onClick={e=>e.stopPropagation()}>
+      <h3 style={{color:'#14b8a6',marginBottom:12}}>Новое соревнование</h3>
+      <div className="form-group"><label>Название</label>
+        <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Весенний кубок 2026"/>
+      </div>
+      <div className="form-group" style={{marginTop:8}}><label>Дата</label>
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)}/>
+      </div>
+      <div className="btn-row" style={{marginTop:12}}>
+        <button className="btn btn-primary" onClick={handleCreate} disabled={loading}>{loading?'Создание...':'Создать'}</button>
+        <button className="btn btn-secondary" onClick={onClose}>Отмена</button>
+      </div>
+    </div>
+  </div>;
+}
+
+function FirstSyncPreview({previewData,localCounts,onPush,onPull,onMerge,onCancel}){
+  const sc=previewData.counts;
+  return <div className="confirm-overlay" onClick={onCancel}>
+    <div className="confirm-box" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
+      <h3 style={{color:'#14b8a6',marginBottom:12}}>Первая синхронизация</h3>
+      <p style={{color:'#94a3b8',marginBottom:12}}>Событие: <strong>{previewData.event.name}</strong> ({previewData.event.date})</p>
+      <table style={{width:'100%',marginBottom:16}}>
+        <thead><tr><th>Тип</th><th>Локально</th><th>На сервере</th></tr></thead>
+        <tbody>
+          <tr><td>Спортсмены</td><td>{localCounts.athletes}</td><td>{sc.athletes}</td></tr>
+          <tr><td>Freestyle</td><td>{localCounts.freestyle_results}</td><td>{sc.freestyle_results}</td></tr>
+          <tr><td>Base</td><td>{localCounts.base_results}</td><td>{sc.base_results}</td></tr>
+        </tbody>
+      </table>
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {sc.athletes>0&&<button className="btn btn-primary" onClick={onPull}>⬇ Загрузить с сервера (заменить локальные)</button>}
+        {localCounts.athletes>0&&<button className="btn btn-success" onClick={onPush}>⬆ Отправить на сервер</button>}
+        {sc.athletes>0&&localCounts.athletes>0&&<button className="btn" style={{background:'#a855f7',color:'#fff'}} onClick={onMerge}>🔄 Объединить (per-record merge)</button>}
+        <button className="btn btn-secondary" onClick={onCancel}>Отмена</button>
+      </div>
+    </div>
+  </div>;
+}
+
+function SyncBar({syncManager,onSyncComplete,currentData,toast}){
+  const[status,setStatus]=useState(syncManager.isConfigured?'idle':'no-event');
+  const[showEventSelector,setShowEventSelector]=useState(false);
+  const[showPreview,setShowPreview]=useState(false);
+  const[previewData,setPreviewData]=useState(null);
+  const[showCreateEvent,setShowCreateEvent]=useState(false);
+  const[isOnline,setIsOnline]=useState(navigator.onLine);
+
+  useEffect(()=>{
+    const on=()=>setIsOnline(true);
+    const off=()=>setIsOnline(false);
+    window.addEventListener('online',on);
+    window.addEventListener('offline',off);
+    return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};
+  },[]);
+
+  async function handleSync(){
+    if(!syncManager.isConfigured){setShowEventSelector(true);return;}
+    if(!syncManager.lastSyncAt){
+      try{setStatus('syncing');const preview=await syncManager.preview();setPreviewData(preview);setShowPreview(true);setStatus('idle');}
+      catch(e){setStatus('error');toast(`Ошибка: ${e.message}`);}
+      return;
+    }
+    await doSync();
+  }
+  async function doSync(){
+    try{
+      setStatus('syncing');
+      const result=await syncManager.sync(currentData);
+      if(result.pulled.count>0){
+        const merged=syncManager.mergeRecords(result.pulled.records,currentData);
+        onSyncComplete(merged);
+        toast(`Синхронизировано: ↑${result.pushed.accepted} ↓${result.pulled.count}`);
+      }else{
+        toast(`Отправлено: ${result.pushed.accepted} записей`);
+      }
+      if(result.pushed.conflicts?.length>0)toast(`⚠ ${result.pushed.conflicts.length} конфликтов (сервер новее)`);
+      setStatus('idle');
+    }catch(e){setStatus('error');toast(`Ошибка синхронизации: ${e.message}`);}
+  }
+
+  return <>
+    <div className="sync-bar">
+      <span className="sync-event-badge" onClick={()=>setShowEventSelector(true)}>
+        {syncManager.eventId?`📋 ${syncManager.eventId}`:'⚙ Выбрать событие'}
+      </span>
+      <button className={`btn btn-sm sync-btn sync-btn-${status}`} onClick={handleSync} disabled={status==='syncing'}>
+        {status==='syncing'?'🔄 Синхронизация...':status==='error'?'❌ Повторить':'☁️ Синхронизировать'}
+      </button>
+      <span className={`sync-indicator ${isOnline?'online':'offline'}`}>{isOnline?'🟢':'🔴 офлайн'}</span>
+    </div>
+    {showEventSelector&&<EventSelector
+      syncManager={syncManager}
+      onSelect={(eid)=>{syncManager.setEventId(eid);setShowEventSelector(false);setStatus('idle');}}
+      onClose={()=>setShowEventSelector(false)}
+      onCreateNew={()=>{setShowEventSelector(false);setShowCreateEvent(true);}}
+    />}
+    {showCreateEvent&&<CreateEventDialog
+      syncManager={syncManager}
+      onCreate={(evt)=>{syncManager.setEventId(evt.id);setShowCreateEvent(false);setStatus('idle');}}
+      onClose={()=>setShowCreateEvent(false)}
+    />}
+    {showPreview&&<FirstSyncPreview
+      previewData={previewData}
+      localCounts={{athletes:currentData.athletes.length,freestyle_results:currentData.freestyleResults.length,base_results:currentData.baseResults.length}}
+      onPush={()=>{setShowPreview(false);doSync();}}
+      onPull={async()=>{
+        setShowPreview(false);
+        try{
+          setStatus('syncing');
+          const pulled=await syncManager.pullOnly();
+          const merged=syncManager.mergeRecords(pulled.records,{athletes:[],freestyleResults:[],baseResults:[],ageCatsF:currentData.ageCatsF,ageCatsB:currentData.ageCatsB});
+          onSyncComplete(merged);
+          toast(`Загружено с сервера: ${pulled.count} записей`);
+          setStatus('idle');
+        }catch(e){setStatus('error');toast(`Ошибка: ${e.message}`);}
+      }}
+      onMerge={()=>{setShowPreview(false);doSync();}}
+      onCancel={()=>setShowPreview(false)}
+    />}
+  </>;
+}
+
 /* ========== APP ========== */
 function App(){
   const [tab,setTab]=useState(0);
@@ -896,18 +1189,39 @@ function App(){
   const [ageCatsF,setAgeCatsF]=useState(()=>loadLS("comp_age_categories_freestyle",DEFAULT_AGE_CATS));
   const [ageCatsB,setAgeCatsB]=useState(()=>loadLS("comp_age_categories_base",DEFAULT_AGE_CATS));
   const [toastMsg,setToastMsg]=useState("");
+  const [syncMgr]=useState(()=>new SyncManager());
 
-  useEffect(()=>saveLS("comp_athletes",athletes),[athletes]);
-  useEffect(()=>saveLS("comp_freestyle_results",freestyleResults),[freestyleResults]);
-  useEffect(()=>saveLS("comp_base_results",baseResults),[baseResults]);
-  useEffect(()=>saveLS("comp_age_categories_freestyle",ageCatsF),[ageCatsF]);
-  useEffect(()=>saveLS("comp_age_categories_base",ageCatsB),[ageCatsB]);
+  useEffect(()=>saveLSTracked("comp_athletes",athletes,syncMgr),[athletes]);
+  useEffect(()=>saveLSTracked("comp_freestyle_results",freestyleResults,syncMgr),[freestyleResults]);
+  useEffect(()=>saveLSTracked("comp_base_results",baseResults,syncMgr),[baseResults]);
+  useEffect(()=>saveLSTracked("comp_age_categories_freestyle",ageCatsF,syncMgr),[ageCatsF]);
+  useEffect(()=>saveLSTracked("comp_age_categories_base",ageCatsB,syncMgr),[ageCatsB]);
 
   const showToast=useCallback((msg)=>setToastMsg(msg),[]);
+
+  const handleSyncComplete=useCallback((merged)=>{
+    setAthletes(merged.athletes);
+    setFreestyleResults(merged.freestyleResults);
+    setBaseResults(merged.baseResults);
+    setAgeCatsF(merged.ageCatsF);
+    setAgeCatsB(merged.ageCatsB);
+  },[]);
+
+  useEffect(()=>{
+    function handleOnline(){
+      if(syncMgr.isConfigured&&syncMgr.lastSyncAt){
+        const last=new Date(syncMgr.lastSyncAt).getTime();
+        if(Date.now()-last>5*60*1000)showToast('Соединение восстановлено');
+      }
+    }
+    window.addEventListener('online',handleOnline);
+    return()=>window.removeEventListener('online',handleOnline);
+  },[]);
 
   return <>
     <div className="header">
       <h1>WU Протокол Соревнований</h1>
+      <SyncBar syncManager={syncMgr} onSyncComplete={handleSyncComplete} currentData={{athletes,freestyleResults,baseResults,ageCatsF,ageCatsB}} toast={showToast}/>
       <a href="index.html">&larr; Калькулятор</a>
     </div>
 
@@ -916,7 +1230,7 @@ function App(){
     </div>
 
     <div className="container">
-      {tab===0&&<AthletesTab athletes={athletes} setAthletes={setAthletes}/>}
+      {tab===0&&<AthletesTab athletes={athletes} setAthletes={setAthletes} clearResults={()=>{setFreestyleResults([]);setBaseResults([])}}/>}
       {tab===1&&<JudgingTab athletes={athletes} freestyleResults={freestyleResults} setFreestyleResults={setFreestyleResults} baseResults={baseResults} setBaseResults={setBaseResults} toast={showToast}/>}
       {tab===2&&<ProtocolTab freestyleResults={freestyleResults} baseResults={baseResults}/>}
       {tab===3&&<WinnersTab freestyleResults={freestyleResults} baseResults={baseResults} ageCatsF={ageCatsF} setAgeCatsF={setAgeCatsF} ageCatsB={ageCatsB} setAgeCatsB={setAgeCatsB}/>}
