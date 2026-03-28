@@ -246,6 +246,34 @@ function AthletesTab({athletes,setAthletes}){
 
   const allLevelNames=[...LEVELS.map(l=>l.name),...BASE_LEVELS.map(l=>l.name)];
 
+  const KTREN_20260328=[
+    {id:"5029272",group:"М-118",name:"Чумаков Дмитрий Васильевич",sex:"м",age:9,level:"SPIRIT 2",dir:"freestyle"},
+    {id:"8195019",group:"А-29",name:"Утробин Артём Павлович",sex:"м",age:13,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+    {id:"2692686",group:"А-219",name:"Вежеев Андрей Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
+    {id:"9618048",group:"А-218",name:"Веселов Роман Александрович",sex:"м",age:9,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"8812813",group:"А-218",name:"Мотошков Антон Александрович",sex:"м",age:15,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+    {id:"6720865",group:"М-117",name:"Осеев Арсений Александрович",sex:"м",age:16,level:"SPIRIT 3",dir:"freestyle"},
+    {id:"8856479",group:"М-118",name:"Попков Константин",sex:"м",age:9,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+    {id:"8675768",group:"М-118",name:"Красноперов Михаил Евгеньевич",sex:"м",age:10,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"1555503",group:"М-117",name:"Логинов Андрей Сергеевич",sex:"м",age:16,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"3465559",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 2",dir:"freestyle"},
+    {id:"9465379",group:"М-117",name:"Загвоздкин Роман",sex:"м",age:11,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+    {id:"1216737",group:"М-117",name:"Стерхов Илья Андреевич",sex:"м",age:16,level:"SPIRIT 4",dir:"freestyle"},
+    {id:"6796134",group:"А-219",name:"Желудов Михаил Григорьевич",sex:"м",age:13,level:"SPIRIT 3",dir:"freestyle"},
+    {id:"2994490",group:"А-218",name:"Вахрушев Савелий Александрович",sex:"м",age:10,level:"SPIRIT 1 Diligent",dir:"freestyle"},
+    {id:"6700110",group:"М-117",name:"Тарасов Лев Владимирович",sex:"м",age:16,level:"SPIRIT 2",dir:"freestyle"},
+    {id:"3463774",group:"М-19",name:"Байгозин Константин Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
+    {id:"8727201",group:"А-218",name:"Внукова Софья Дмитриевна",sex:"ж",age:8,level:"SPIRIT 1 Prepared",dir:"freestyle"},
+    {id:"6591704",group:"А-29",name:"Михеев Михаил Владимирович",sex:"м",age:13,level:"SPIRIT 1 Diligent",dir:"freestyle"},
+    {id:"2287600",group:"М-19",name:"Дулесов Максим Антонович",sex:"м",age:13,level:"BASE 3",dir:"base"},
+    {id:"4131799",group:"А-219",name:"Колеватов Иван Романович",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
+    {id:"2516131",group:"М-117",name:"Кулаков Кирилл Никитич",sex:"м",age:11,level:"SPIRIT 3",dir:"freestyle"},
+    {id:"4251838",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 1 Biginner",dir:"freestyle"},
+    {id:"8939040",group:"А-219",name:"Новосёлов Дмитрий",sex:"м",age:13,level:"SPIRIT 2",dir:"freestyle"}
+  ];
+
+  function loadKtren(){setAthletes(KTREN_20260328);}
+
   function importCsv(){
     if(!csv.trim())return;
     const lines=csv.trim().split("\n").filter(l=>l.trim());
@@ -274,6 +302,8 @@ function AthletesTab({athletes,setAthletes}){
 
   return <div>
     <div className="card">
+      <h3 style={{marginBottom:12,color:"#14b8a6"}}>Быстрая загрузка</h3>
+      <button className="btn" style={{background:"#a855f7",color:"#fff",marginBottom:12,width:"100%",padding:"12px",fontSize:15,fontWeight:600}} onClick={loadKtren}>🏋️ Загрузить К трен 28/03/26 (23 спортсмена)</button>
       <h3 style={{marginBottom:12,color:"#14b8a6"}}>Импорт CSV</h3>
       <p style={{fontSize:12,color:"#64748b",marginBottom:8}}>Формат: id;группа;ФИО;пол;возраст;уровень;направление</p>
       <textarea value={csv} onChange={e=>setCsv(e.target.value)} placeholder="100006;М-118;Трескин Кирилл Денисович;м;12;SPIRIT 3;freestyle"/>
