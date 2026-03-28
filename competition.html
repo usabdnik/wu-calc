@@ -297,6 +297,13 @@ function AthletesTab({athletes,setAthletes}){
     setForm({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"freestyle"});
   }
 
+  const [editIdx,setEditIdx]=useState(null);
+  const [editData,setEditData]=useState({});
+
+  function startEdit(i){setEditIdx(i);setEditData({...athletes[i]});}
+  function saveEdit(){setAthletes(prev=>prev.map((a,i)=>i===editIdx?{...editData,age:parseInt(editData.age)||0,sex:editData.sex.toLowerCase(),dir:editData.dir.toLowerCase()}:a));setEditIdx(null);}
+  function cancelEdit(){setEditIdx(null);}
+
   function removeAthlete(idx){setAthletes(prev=>prev.filter((_,i)=>i!==idx))}
   function clearAll(){setConfirm(true)}
 
@@ -342,11 +349,20 @@ function AthletesTab({athletes,setAthletes}){
       {athletes.length===0?<div className="empty">Нет загруженных участников</div>:
       <div className="table-wrap"><table>
         <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Пол</th><th>Лет</th><th>Уровень</th><th>Напр.</th><th></th></tr></thead>
-        <tbody>{athletes.map((a,i)=><tr key={i}>
+        <tbody>{athletes.map((a,i)=>editIdx===i?<tr key={i} style={{background:"#1e293b"}}>
+          <td>{a.id}</td>
+          <td><input style={{width:60,padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.group} onChange={e=>setEditData({...editData,group:e.target.value})}/></td>
+          <td><input style={{width:"100%",padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.name} onChange={e=>setEditData({...editData,name:e.target.value})}/></td>
+          <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.sex} onChange={e=>setEditData({...editData,sex:e.target.value})}><option value="м">М</option><option value="ж">Ж</option></select></td>
+          <td><input type="number" style={{width:45,padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.age} onChange={e=>setEditData({...editData,age:e.target.value})}/></td>
+          <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.level} onChange={e=>setEditData({...editData,level:e.target.value})}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select></td>
+          <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.dir} onChange={e=>setEditData({...editData,dir:e.target.value})}><option value="freestyle">freestyle</option><option value="base">base</option></select></td>
+          <td style={{whiteSpace:"nowrap"}}><button className="btn btn-primary btn-sm" onClick={saveEdit}>✓</button>{" "}<button className="btn btn-secondary btn-sm" onClick={cancelEdit}>✕</button></td>
+        </tr>:<tr key={i}>
           <td>{a.id}</td><td>{a.group}</td><td>{a.name}</td>
           <td><span className={(a.sex||"")=="ж"?"badge badge-female":"badge badge-male"}>{(a.sex||"?").toUpperCase()}</span></td>
           <td>{a.age}</td><td>{a.level}</td><td>{a.dir}</td>
-          <td><button className="btn btn-danger btn-sm" onClick={()=>removeAthlete(i)}>×</button></td>
+          <td style={{whiteSpace:"nowrap"}}><button className="btn btn-secondary btn-sm" onClick={()=>startEdit(i)} style={{marginRight:4}}>✎</button><button className="btn btn-danger btn-sm" onClick={()=>removeAthlete(i)}>×</button></td>
         </tr>)}</tbody>
       </table></div>}
     </div>
