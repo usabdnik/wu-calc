@@ -261,6 +261,8 @@ function AthletesTab({athletes,setAthletes,clearResults,syncManager}){
   const [eventsLoading,setEventsLoading]=useState(false);
   const [loadingEventId,setLoadingEventId]=useState(null);
   const [confirmEvent,setConfirmEvent]=useState(null);
+  const [serverLoading,setServerLoading]=useState(false);
+  const [serverPreview,setServerPreview]=useState(null);
 
   const allLevelNames=[...LEVELS.map(l=>l.name),...BASE_LEVELS.map(l=>l.name)];
 
@@ -290,6 +292,37 @@ function AthletesTab({athletes,setAthletes,clearResults,syncManager}){
     }catch(e){console.error(e);}
     setLoadingEventId(null);
     setConfirmEvent(null);
+  }
+
+  async function loadFromServer(){
+    setServerLoading(true);
+    try{
+      const API_BASE='https://api.workoutudm.ru/api/competition';
+      const API_KEY='SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE';
+      const today=new Date().toISOString().slice(0,10);
+      const res=await fetch(`${API_BASE}/athletes?date=${today}`,{headers:{'X-API-Key':API_KEY}});
+      if(!res.ok){const txt=await res.text();throw new Error(`${res.status}: ${txt.slice(0,200)}`);}
+      const data=await res.json();
+      if(data.count===0){setServerLoading(false);alert('На сегодня нет записей на контрольные тренировки');return;}
+      setServerPreview(data);
+    }catch(e){console.error(e);alert(`Ошибка загрузки: ${e.message}`);}
+    setServerLoading(false);
+  }
+
+  function confirmServerLoad(){
+    if(!serverPreview)return;
+    const incoming=serverPreview.athletes.map(a=>({id:String(a.id),name:a.name,group:a.group,sex:a.sex,age:a.age,level:a.level,dir:a.direction,present:true}));
+    setAthletes(prev=>{
+      const existing=new Map(prev.map(a=>[a.id,a]));
+      for(const a of incoming){
+        if(existing.has(a.id)){
+          const old=existing.get(a.id);
+          existing.set(a.id,{...old,name:a.name,group:a.group||old.group,age:a.age||old.age,level:a.level,dir:a.dir});
+        }else{existing.set(a.id,a);}
+      }
+      return Array.from(existing.values());
+    });
+    setServerPreview(null);
   }
 
   useEffect(()=>{if(showLoad&&events.length===0)fetchEvents()},[showLoad]);
@@ -335,6 +368,12 @@ function AthletesTab({athletes,setAthletes,clearResults,syncManager}){
         Загрузка / Импорт <span style={{fontSize:14,color:"#64748b"}}>{showLoad?"▲":"▼"}</span>
       </h3>
       {showLoad&&<div style={{marginTop:12}}>
+        <h4 style={{marginBottom:8,color:"#94a3b8",fontSize:14}}>Загрузить с сервера (МойКласс + разряды)</h4>
+        <p style={{fontSize:12,color:"#64748b",marginBottom:8}}>Автосборка: записи на контрольную тренировку (сегодня) + разряды из Coach App</p>
+        <button className="btn btn-success" onClick={loadFromServer} disabled={serverLoading} style={{marginBottom:16}}>
+          {serverLoading?'⏳ Загрузка...':'🏋️ Загрузить с сервера'}
+        </button>
+
         <h4 style={{marginBottom:8,color:"#94a3b8",fontSize:14}}>Загрузить из события</h4>
         {eventsLoading?<div style={{color:"#64748b",padding:8}}>Загрузка...</div>:
         events.length===0?<div style={{color:"#64748b",padding:8,fontSize:13}}>Нет доступных событий</div>:
@@ -411,6 +450,22 @@ function AthletesTab({athletes,setAthletes,clearResults,syncManager}){
 
     {confirm&&<ConfirmDialog msg="Удалить всех участников?" onYes={()=>{setAthletes([]);clearResults();setConfirm(false)}} onNo={()=>setConfirm(false)}/>}
     {confirmEvent&&<ConfirmDialog msg={`Загрузить участников из "${confirmEvent.name}"? Текущие участники и результаты будут сброшены.`} onYes={()=>loadFromEvent(confirmEvent)} onNo={()=>setConfirmEvent(null)}/>}
+    {serverPreview&&<div className="confirm-overlay" onClick={()=>setServerPreview(null)}>
+      <div className="confirm-box" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
+        <h3 style={{color:"#14b8a6",marginBottom:12}}>Загрузка с сервера</h3>
+        <p style={{marginBottom:8}}>Найдено <strong>{serverPreview.count}</strong> спортсменов на <strong>{serverPreview.date}</strong></p>
+        <p style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>Источники: {serverPreview.sources.moyklass_lessons||0} тренировок, {serverPreview.sources.moyklass_signups||0} записей, {serverPreview.sources.coach_athletes||0} в Coach App</p>
+        <div style={{maxHeight:200,overflowY:"auto",border:"1px solid #334155",borderRadius:8,marginBottom:12}}>
+          <table><thead><tr><th>ФИО</th><th>Гр</th><th>Ур</th><th>Возр</th></tr></thead>
+          <tbody>{serverPreview.athletes.map((a,i)=><tr key={i}><td>{a.name}</td><td>{a.group}</td><td>{a.level}</td><td>{a.age}</td></tr>)}</tbody></table>
+        </div>
+        <p style={{fontSize:12,color:"#64748b",marginBottom:12}}>Существующие участники будут обновлены по ID, новые — добавлены.</p>
+        <div className="btn-row">
+          <button className="btn btn-success" onClick={confirmServerLoad}>Загрузить</button>
+          <button className="btn btn-secondary" onClick={()=>setServerPreview(null)}>Отмена</button>
+        </div>
+      </div>
+    </div>}
   </div>;
 }
 
@@ -959,6 +1014,12 @@ class SyncManager {
     this.deviceId=this._getOrCreateDeviceId();
     this.meta=this._loadMeta();
     this.timestamps=this._loadTimestamps();
+    this.role=localStorage.getItem('comp_sync_role')||null;
+    this.pendingChanges=[];
+    this._autoPushTimer=null;
+    this._pollTimer=null;
+    this._onSyncUpdate=null;
+    this._currentDataRef=null;
   }
   _getOrCreateDeviceId(){
     let id=localStorage.getItem('comp_device_id');
@@ -1055,6 +1116,96 @@ class SyncManager {
   _recalcAthleteIdx(athletes,results){
     for(const r of results){const idx=athletes.findIndex(a=>a.id===r.id);if(idx>=0)r.athleteIdx=idx;}
   }
+
+  // --- Realtime Sync: Role management ---
+  async setRole(role){
+    if(!this.eventId)throw new Error('No event selected');
+    const res=await fetch(`${this.API_BASE}/sync/role`,{method:'POST',headers:this._headers(),body:JSON.stringify({event_id:this.eventId,device_id:this.deviceId,role})});
+    if(!res.ok)throw new Error(`Set role failed: ${res.status}`);
+    this.role=role;
+    localStorage.setItem('comp_sync_role',role);
+    return await res.json();
+  }
+  async fetchRoles(){
+    if(!this.eventId)return{roles:[],leader:null};
+    const res=await fetch(`${this.API_BASE}/sync/role?event_id=${encodeURIComponent(this.eventId)}`,{headers:this._headers()});
+    if(!res.ok)throw new Error(`Fetch roles failed: ${res.status}`);
+    return await res.json();
+  }
+
+  // --- Realtime Sync: Auto-push (leader mode) ---
+  schedulePush(currentData){
+    if(this.role!=='leader'||!this.isConfigured)return;
+    this._currentDataRef=currentData;
+    if(!navigator.onLine){
+      this.pendingChanges.push({ts:Date.now()});
+      return;
+    }
+    if(this._autoPushTimer)clearTimeout(this._autoPushTimer);
+    this._autoPushTimer=setTimeout(()=>{this._doAutoPush();},2000);
+  }
+  async _doAutoPush(){
+    if(!this._currentDataRef||!this.isConfigured)return;
+    try{
+      const result=await this.sync(this._currentDataRef);
+      this.pendingChanges=[];
+      if(this._onSyncUpdate)this._onSyncUpdate({type:'pushed',result});
+    }catch(e){
+      console.error('Auto-push failed:',e);
+      this.pendingChanges.push({ts:Date.now(),error:e.message});
+      if(this._onSyncUpdate)this._onSyncUpdate({type:'push-error',error:e.message});
+    }
+  }
+
+  // --- Realtime Sync: Polling (viewer mode) ---
+  startPolling(onUpdate){
+    this.stopPolling();
+    if(!this.isConfigured)return;
+    this._pollTimer=setInterval(async()=>{
+      if(!navigator.onLine)return;
+      try{
+        const pulled=await this.pullOnly();
+        if(pulled.count>0&&onUpdate)onUpdate(pulled);
+      }catch(e){console.error('Poll failed:',e);}
+    },3000);
+  }
+  stopPolling(){
+    if(this._pollTimer){clearInterval(this._pollTimer);this._pollTimer=null;}
+  }
+
+  // --- Realtime Sync: Offline queue ---
+  async flushPending(currentData){
+    if(!navigator.onLine||!this.isConfigured||this.pendingChanges.length===0)return false;
+    try{
+      const result=await this.sync(currentData);
+      this.pendingChanges=[];
+      if(this._onSyncUpdate)this._onSyncUpdate({type:'flushed',result});
+      return true;
+    }catch(e){
+      console.error('Flush pending failed:',e);
+      return false;
+    }
+  }
+
+  // --- Realtime Sync: Version history ---
+  async fetchHistory(limit=50){
+    if(!this.eventId)throw new Error('No event selected');
+    const res=await fetch(`${this.API_BASE}/sync/history?event_id=${encodeURIComponent(this.eventId)}&limit=${limit}`,{headers:this._headers()});
+    if(!res.ok)throw new Error(`History fetch failed: ${res.status}`);
+    return await res.json();
+  }
+  async rollback(version){
+    if(!this.eventId)throw new Error('No event selected');
+    const res=await fetch(`${this.API_BASE}/sync/rollback`,{method:'POST',headers:this._headers(),body:JSON.stringify({event_id:this.eventId,version,device_id:this.deviceId})});
+    if(!res.ok)throw new Error(`Rollback failed: ${res.status}`);
+    return await res.json();
+  }
+
+  // --- Cleanup ---
+  destroy(){
+    this.stopPolling();
+    if(this._autoPushTimer)clearTimeout(this._autoPushTimer);
+  }
 }
 
 /* ========== SYNC UI COMPONENTS ========== */
@@ -1139,6 +1290,45 @@ function FirstSyncPreview({previewData,localCounts,onPush,onPull,onMerge,onCance
   </div>;
 }
 
+function VersionHistoryModal({syncManager,onRollback,onClose,toast}){
+  const[versions,setVersions]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[rolling,setRolling]=useState(null);
+  useEffect(()=>{
+    syncManager.fetchHistory(50).then(data=>{setVersions(data.versions);setLoading(false);}).catch(e=>{toast(`Ошибка: ${e.message}`);onClose();});
+  },[]);
+  async function handleRollback(v){
+    if(!confirm(`Откатить к версии ${v.version}? Текущие данные на сервере будут заменены.`))return;
+    setRolling(v.version);
+    try{
+      const result=await syncManager.rollback(v.version);
+      toast(`Откат к v${v.version}: ${result.records_restored} записей восстановлено`);
+      onRollback(result);
+    }catch(e){toast(`Ошибка отката: ${e.message}`);}
+    setRolling(null);
+  }
+  return <div className="confirm-overlay" onClick={onClose}>
+    <div className="confirm-box" onClick={e=>e.stopPropagation()} style={{maxWidth:550,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+      <h3 style={{color:'#14b8a6',marginBottom:12}}>История версий</h3>
+      {loading?<div className="empty">Загрузка...</div>:
+      versions.length===0?<div className="empty">Нет версий</div>:
+      <div style={{overflowY:'auto',flex:1}}>
+        {versions.map(v=><div key={v.id} style={{padding:'8px 12px',borderBottom:'1px solid #334155',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:600,fontSize:14}}>v{v.version}</div>
+            <div style={{fontSize:12,color:'#94a3b8'}}>{new Date(v.created_at).toLocaleString('ru')} | {v.device_id.slice(0,8)}...</div>
+            <div style={{fontSize:11,color:'#64748b'}}>{v.summary}</div>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={()=>handleRollback(v)} disabled={rolling!==null}>
+            {rolling===v.version?'...':'↩ Откатить'}
+          </button>
+        </div>)}
+      </div>}
+      <button className="btn btn-secondary" onClick={onClose} style={{marginTop:12}}>Закрыть</button>
+    </div>
+  </div>;
+}
+
 function SyncBar({syncManager,onSyncComplete,currentData,toast}){
   const[status,setStatus]=useState(syncManager.isConfigured?'idle':'no-event');
   const[showEventSelector,setShowEventSelector]=useState(false);
@@ -1146,14 +1336,25 @@ function SyncBar({syncManager,onSyncComplete,currentData,toast}){
   const[previewData,setPreviewData]=useState(null);
   const[showCreateEvent,setShowCreateEvent]=useState(false);
   const[isOnline,setIsOnline]=useState(navigator.onLine);
+  const[role,setRole]=useState(syncManager.role);
+  const[pendingCount,setPendingCount]=useState(0);
+  const[showHistory,setShowHistory]=useState(false);
+  const[syncIndicator,setSyncIndicator]=useState('');
 
   useEffect(()=>{
-    const on=()=>setIsOnline(true);
+    const on=()=>{
+      setIsOnline(true);
+      if(syncManager.role==='leader'&&syncManager.pendingChanges.length>0){
+        syncManager.flushPending(currentData).then(ok=>{
+          if(ok){setPendingCount(0);toast('Ожидающие изменения отправлены');}
+        });
+      }
+    };
     const off=()=>setIsOnline(false);
     window.addEventListener('online',on);
     window.addEventListener('offline',off);
     return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};
-  },[]);
+  },[currentData]);
 
   // Auto-select latest active event if none selected
   useEffect(()=>{
@@ -1166,6 +1367,52 @@ function SyncBar({syncManager,onSyncComplete,currentData,toast}){
       }
     }).catch(()=>{});
   },[]);
+
+  // Setup sync update callback
+  useEffect(()=>{
+    syncManager._onSyncUpdate=(ev)=>{
+      if(ev.type==='pushed'||ev.type==='flushed'){setPendingCount(0);setSyncIndicator('✓');}
+      else if(ev.type==='push-error'){setSyncIndicator('!');}
+    };
+    return()=>{syncManager._onSyncUpdate=null;};
+  },[]);
+
+  // Leader auto-push: schedule on data changes
+  useEffect(()=>{
+    if(role==='leader'&&syncManager.isConfigured&&syncManager.lastSyncAt){
+      syncManager.schedulePush(currentData);
+      setPendingCount(syncManager.pendingChanges.length);
+    }
+  },[currentData,role]);
+
+  // Viewer polling
+  useEffect(()=>{
+    if(role==='viewer'&&syncManager.isConfigured){
+      syncManager.startPolling((pulled)=>{
+        if(pulled.count>0){
+          const merged=syncManager.mergeRecords(pulled.records,currentData);
+          onSyncComplete(merged);
+          setSyncIndicator(`↓${pulled.count}`);
+        }
+      });
+    }else{
+      syncManager.stopPolling();
+    }
+    return()=>syncManager.stopPolling();
+  },[role,syncManager.eventId]);
+
+  async function handleRoleChange(newRole){
+    if(!syncManager.isConfigured){toast('Сначала выберите событие');return;}
+    try{
+      await syncManager.setRole(newRole);
+      setRole(newRole);
+      if(newRole==='viewer'){syncManager.stopPolling();syncManager.startPolling((pulled)=>{
+        if(pulled.count>0){const merged=syncManager.mergeRecords(pulled.records,currentData);onSyncComplete(merged);}
+      });}
+      else{syncManager.stopPolling();}
+      toast(newRole==='leader'?'Режим: Я сужу (авто-push)':'Режим: Я смотрю (авто-pull)');
+    }catch(e){toast(`Ошибка: ${e.message}`);}
+  }
 
   async function handleSync(){
     if(!syncManager.isConfigured){setShowEventSelector(true);return;}
@@ -1188,19 +1435,45 @@ function SyncBar({syncManager,onSyncComplete,currentData,toast}){
         toast(`Отправлено: ${result.pushed.accepted} записей`);
       }
       if(result.pushed.conflicts?.length>0)toast(`⚠ ${result.pushed.conflicts.length} конфликтов (сервер новее)`);
-      setStatus('idle');
+      setStatus('idle');setPendingCount(0);
     }catch(e){setStatus('error');toast(`Ошибка синхронизации: ${e.message}`);}
   }
+
+  async function handleRollback(result){
+    setShowHistory(false);
+    // After rollback, pull the restored state
+    try{
+      setStatus('syncing');
+      const pulled=await syncManager.pullOnly();
+      const merged=syncManager.mergeRecords(pulled.records,{athletes:[],freestyleResults:[],baseResults:[],ageCatsF:currentData.ageCatsF,ageCatsB:currentData.ageCatsB});
+      onSyncComplete(merged);
+      setStatus('idle');
+    }catch(e){setStatus('error');toast(`Ошибка загрузки после отката: ${e.message}`);}
+  }
+
+  const roleColor=role==='leader'?'#22c55e':role==='viewer'?'#3b82f6':'#64748b';
+  const statusText=!isOnline?`🔴 Offline${pendingCount>0?` (${pendingCount})`:''}`
+    :role==='leader'?(pendingCount>0?`⏳ Не синхр. (${pendingCount})`:(syncIndicator==='✓'?'✅ Сохранено':''))
+    :role==='viewer'?(syncIndicator?`↓ ${syncIndicator}`:'👁 Наблюдение')
+    :'';
 
   return <>
     <div className="sync-bar">
       <span className="sync-event-badge" onClick={()=>setShowEventSelector(true)}>
         {syncManager.eventId?`📋 ${syncManager.eventId}`:'⚙ Выбрать событие'}
       </span>
+      {syncManager.isConfigured&&<>
+        <button style={{padding:'4px 10px',borderRadius:8,border:'1px solid '+roleColor,background:role?roleColor+'22':'transparent',color:roleColor,fontSize:12,fontWeight:600,cursor:'pointer'}}
+          onClick={()=>handleRoleChange(role==='leader'?'viewer':'leader')}>
+          {role==='leader'?'🏆 Я сужу':role==='viewer'?'👁 Я смотрю':'⚡ Выбрать роль'}
+        </button>
+        <button className="btn btn-sm btn-secondary" onClick={()=>setShowHistory(true)} style={{fontSize:12}}>📜 История</button>
+      </>}
       <button className={`btn btn-sm sync-btn sync-btn-${status}`} onClick={handleSync} disabled={status==='syncing'}>
         {status==='syncing'?'🔄 Синхронизация...':status==='error'?'❌ Повторить':'☁️ Синхронизировать'}
       </button>
-      <span className={`sync-indicator ${isOnline?'online':'offline'}`}>{isOnline?'🟢':'🔴 офлайн'}</span>
+      {statusText&&<span style={{fontSize:11,color:roleColor,fontWeight:500}}>{statusText}</span>}
+      <span className={`sync-indicator ${isOnline?'online':'offline'}`}>{isOnline?'🟢':'🔴'}</span>
     </div>
     {showEventSelector&&<EventSelector
       syncManager={syncManager}
@@ -1231,6 +1504,7 @@ function SyncBar({syncManager,onSyncComplete,currentData,toast}){
       onMerge={()=>{setShowPreview(false);doSync();}}
       onCancel={()=>setShowPreview(false)}
     />}
+    {showHistory&&<VersionHistoryModal syncManager={syncManager} onRollback={handleRollback} onClose={()=>setShowHistory(false)} toast={toast}/>}
   </>;
 }
 
@@ -1244,6 +1518,8 @@ function App(){
   const [ageCatsB,setAgeCatsB]=useState(()=>loadLS("comp_age_categories_base",DEFAULT_AGE_CATS));
   const [toastMsg,setToastMsg]=useState("");
   const [syncMgr]=useState(()=>new SyncManager());
+
+  useEffect(()=>()=>syncMgr.destroy(),[]);
 
   useEffect(()=>saveLSTracked("comp_athletes",athletes,syncMgr),[athletes]);
   useEffect(()=>saveLSTracked("comp_freestyle_results",freestyleResults,syncMgr),[freestyleResults]);
