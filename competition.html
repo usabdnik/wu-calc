@@ -251,42 +251,48 @@ function ConfirmDialog({msg,onYes,onNo}){
 }
 
 /* ========== TAB 1: ATHLETES ========== */
-function AthletesTab({athletes,setAthletes,clearResults}){
+function AthletesTab({athletes,setAthletes,clearResults,syncManager}){
   const [csv,setCsv]=useState("");
   const [form,setForm]=useState({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"base"});
   const [confirm,setConfirm]=useState(false);
-  const [confirmKtren,setConfirmKtren]=useState(false);
+  const [showLoad,setShowLoad]=useState(false);
+  const [showAdd,setShowAdd]=useState(false);
+  const [events,setEvents]=useState([]);
+  const [eventsLoading,setEventsLoading]=useState(false);
+  const [loadingEventId,setLoadingEventId]=useState(null);
+  const [confirmEvent,setConfirmEvent]=useState(null);
 
   const allLevelNames=[...LEVELS.map(l=>l.name),...BASE_LEVELS.map(l=>l.name)];
 
-  const KTREN_20260328=[
-    {id:"5029272",group:"М-118",name:"Чумаков Дмитрий Васильевич",sex:"м",age:9,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"8195019",group:"А-29",name:"Утробин Артём Павлович",sex:"м",age:13,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"2692686",group:"А-219",name:"Вежеев Андрей Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"9618048",group:"А-218",name:"Веселов Роман Александрович",sex:"м",age:9,level:"SPIRIT 1 Biginner",dir:"base"},
-    {id:"8812813",group:"А-218",name:"Мотошков Антон Александрович",sex:"м",age:15,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"6720865",group:"М-117",name:"Осеев Арсений Александрович",sex:"м",age:16,level:"SPIRIT 3",dir:"freestyle"},
-    {id:"8856479",group:"М-118",name:"Попков Константин",sex:"м",age:9,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"8675768",group:"М-118",name:"Красноперов Михаил Евгеньевич",sex:"м",age:10,level:"SPIRIT 1 Biginner",dir:"base"},
-    {id:"1555503",group:"М-117",name:"Логинов Андрей Сергеевич",sex:"м",age:16,level:"SPIRIT 1 Biginner",dir:"base"},
-    {id:"3465559",group:"М-19",name:"Бобылев Мирослав Романович",sex:"м",age:13,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"9465379",group:"М-117",name:"Загвоздкин Роман",sex:"м",age:11,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"1216737",group:"М-117",name:"Стерхов Илья Андреевич",sex:"м",age:16,level:"SPIRIT 4",dir:"freestyle"},
-    {id:"6796134",group:"А-219",name:"Желудов Михаил Григорьевич",sex:"м",age:13,level:"SPIRIT 3",dir:"freestyle"},
-    {id:"2994490",group:"А-218",name:"Вахрушев Савелий Александрович",sex:"м",age:10,level:"SPIRIT 1 Diligent",dir:"base"},
-    {id:"6700110",group:"М-117",name:"Тарасов Лев Владимирович",sex:"м",age:16,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"3463774",group:"М-19",name:"Байгозин Константин Николаевич",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"8727201",group:"А-218",name:"Внукова Софья Дмитриевна",sex:"ж",age:8,level:"SPIRIT 1 Prepared",dir:"freestyle"},
-    {id:"6591704",group:"А-29",name:"Михеев Михаил Владимирович",sex:"м",age:13,level:"SPIRIT 1 Diligent",dir:"base"},
-    {id:"2287600",group:"М-19",name:"Дулесов Максим Антонович",sex:"м",age:13,level:"BASE 3",dir:"base"},
-    {id:"4131799",group:"А-219",name:"Колеватов Иван Романович",sex:"м",age:14,level:"SPIRIT 2",dir:"freestyle"},
-    {id:"2516131",group:"М-117",name:"Кулаков Кирилл Никитич",sex:"м",age:11,level:"SPIRIT 3",dir:"freestyle"},
-    {id:"4251838",group:"М-118",name:"Трескин Кирилл Денисович",sex:"м",age:12,level:"SPIRIT 1 Biginner",dir:"base"},
-    {id:"8939040",group:"А-219",name:"Новосёлов Дмитрий",sex:"м",age:13,level:"SPIRIT 2",dir:"freestyle"}
-  ];
+  async function fetchEvents(){
+    setEventsLoading(true);
+    try{
+      const API_BASE='https://api.workoutudm.ru/api/competition';
+      const API_KEY='SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE';
+      const res=await fetch(`${API_BASE}/events`,{headers:{'X-API-Key':API_KEY}});
+      if(!res.ok)throw new Error('Ошибка загрузки');
+      const data=await res.json();
+      setEvents(data.events||[]);
+    }catch(e){console.error(e);}
+    setEventsLoading(false);
+  }
 
-  function loadKtren(){setConfirmKtren(true)}
-  function doLoadKtren(){setAthletes(KTREN_20260328);clearResults();setConfirmKtren(false)}
+  async function loadFromEvent(ev){
+    setLoadingEventId(ev.id);
+    try{
+      const API_BASE='https://api.workoutudm.ru/api/competition';
+      const API_KEY='SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE';
+      const res=await fetch(`${API_BASE}/sync?event_id=${encodeURIComponent(ev.id)}&since=1970-01-01T00:00:00Z`,{headers:{'X-API-Key':API_KEY}});
+      if(!res.ok)throw new Error('Ошибка загрузки');
+      const data=await res.json();
+      const athleteRecords=(data.records||[]).filter(r=>r.record_type==='athletes').map(r=>r.data);
+      if(athleteRecords.length>0){setAthletes(athleteRecords);clearResults();}
+    }catch(e){console.error(e);}
+    setLoadingEventId(null);
+    setConfirmEvent(null);
+  }
+
+  useEffect(()=>{if(showLoad&&events.length===0)fetchEvents()},[showLoad]);
 
   function importCsv(){
     if(!csv.trim())return;
@@ -325,18 +331,34 @@ function AthletesTab({athletes,setAthletes,clearResults}){
 
   return <div>
     <div className="card">
-      <h3 style={{marginBottom:12,color:"#14b8a6"}}>Быстрая загрузка</h3>
-      <button className="btn" style={{background:"#a855f7",color:"#fff",marginBottom:12,width:"100%",padding:"12px",fontSize:15,fontWeight:600}} onClick={loadKtren}>🏋️ Загрузить К трен 28/03/26 (23 спортсмена)</button>
-      <h3 style={{marginBottom:12,color:"#14b8a6"}}>Импорт CSV</h3>
-      <p style={{fontSize:12,color:"#64748b",marginBottom:8}}>Формат: id;группа;ФИО;пол;возраст;уровень;направление</p>
-      <textarea value={csv} onChange={e=>setCsv(e.target.value)} placeholder="100006;М-118;Трескин Кирилл Денисович;м;12;SPIRIT 3;freestyle"/>
-      <div style={{marginTop:8}}>
-        <button className="btn btn-primary" onClick={importCsv}>Импорт</button>
-      </div>
+      <h3 style={{cursor:"pointer",color:"#14b8a6",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setShowLoad(!showLoad)}>
+        Загрузка / Импорт <span style={{fontSize:14,color:"#64748b"}}>{showLoad?"▲":"▼"}</span>
+      </h3>
+      {showLoad&&<div style={{marginTop:12}}>
+        <h4 style={{marginBottom:8,color:"#94a3b8",fontSize:14}}>Загрузить из события</h4>
+        {eventsLoading?<div style={{color:"#64748b",padding:8}}>Загрузка...</div>:
+        events.length===0?<div style={{color:"#64748b",padding:8,fontSize:13}}>Нет доступных событий</div>:
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {events.map(ev=><button key={ev.id} className="btn" style={{background:syncManager?.eventId===ev.id?"#1e40af":"#334155",color:"#e2e8f0",textAlign:"left",padding:"10px 14px",fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setConfirmEvent(ev)} disabled={!!loadingEventId}>
+            <span>{ev.name}</span>
+            <span style={{color:"#64748b",fontSize:12}}>{ev.date}</span>
+          </button>)}
+        </div>}
+        <button className="btn btn-secondary btn-sm" onClick={fetchEvents} style={{marginBottom:16}}>Обновить список</button>
+        <h4 style={{marginBottom:8,color:"#94a3b8",fontSize:14}}>Импорт CSV</h4>
+        <p style={{fontSize:12,color:"#64748b",marginBottom:8}}>Формат: id;группа;ФИО;пол;возраст;уровень;направление</p>
+        <textarea value={csv} onChange={e=>setCsv(e.target.value)} placeholder="100006;М-118;Трескин Кирилл Денисович;м;12;SPIRIT 3;freestyle"/>
+        <div style={{marginTop:8}}>
+          <button className="btn btn-primary" onClick={importCsv}>Импорт</button>
+        </div>
+      </div>}
     </div>
 
     <div className="card">
-      <h3 style={{marginBottom:12,color:"#14b8a6"}}>Добавить участника</h3>
+      <h3 style={{cursor:"pointer",color:"#14b8a6",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setShowAdd(!showAdd)}>
+        Добавить участника <span style={{fontSize:14,color:"#64748b"}}>{showAdd?"▲":"▼"}</span>
+      </h3>
+      {showAdd&&<div style={{marginTop:12}}>
       <div className="form-row">
         <div className="form-group"><label>ID</label><input type="text" value={form.id} onChange={e=>setForm({...form,id:e.target.value})} placeholder="Авто"/></div>
         <div className="form-group"><label>Группа</label><input type="text" value={form.group} onChange={e=>setForm({...form,group:e.target.value})}/></div>
@@ -355,6 +377,7 @@ function AthletesTab({athletes,setAthletes,clearResults}){
         </div>
       </div>
       <button className="btn btn-primary" onClick={addManual}>Добавить</button>
+      </div>}
     </div>
 
     <div className="card">
@@ -387,7 +410,7 @@ function AthletesTab({athletes,setAthletes,clearResults}){
     </div>
 
     {confirm&&<ConfirmDialog msg="Удалить всех участников?" onYes={()=>{setAthletes([]);clearResults();setConfirm(false)}} onNo={()=>setConfirm(false)}/>}
-    {confirmKtren&&<ConfirmDialog msg="Загрузить К трен 28/03/26? Текущие участники и результаты будут сброшены." onYes={doLoadKtren} onNo={()=>setConfirmKtren(false)}/>}
+    {confirmEvent&&<ConfirmDialog msg={`Загрузить участников из "${confirmEvent.name}"? Текущие участники и результаты будут сброшены.`} onYes={()=>loadFromEvent(confirmEvent)} onNo={()=>setConfirmEvent(null)}/>}
   </div>;
 }
 
@@ -1261,7 +1284,7 @@ function App(){
     </div>
 
     <div className="container">
-      {tab===0&&<AthletesTab athletes={athletes} setAthletes={setAthletes} clearResults={()=>{setFreestyleResults([]);setBaseResults([])}}/>}
+      {tab===0&&<AthletesTab athletes={athletes} setAthletes={setAthletes} clearResults={()=>{setFreestyleResults([]);setBaseResults([])}} syncManager={syncMgr}/>}
       {tab===1&&<JudgingTab athletes={athletes} freestyleResults={freestyleResults} setFreestyleResults={setFreestyleResults} baseResults={baseResults} setBaseResults={setBaseResults} toast={showToast}/>}
       {tab===2&&<ProtocolTab freestyleResults={freestyleResults} baseResults={baseResults}/>}
       {tab===3&&<WinnersTab athletes={athletes} freestyleResults={freestyleResults} baseResults={baseResults} ageCatsF={ageCatsF} setAgeCatsF={setAgeCatsF} ageCatsB={ageCatsB} setAgeCatsB={setAgeCatsB}/>}
