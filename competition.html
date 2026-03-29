@@ -855,8 +855,8 @@ function AgeCatEditor({label,color,cats,setCats}){
 
 function WinnersTab({athletes,freestyleResults,baseResults,ageCatsF,setAgeCatsF,ageCatsB,setAgeCatsB}){
   const absentIds=useMemo(()=>new Set(athletes.filter(a=>a.present===false).map(a=>a.id)),[athletes]);
-  const passedF=useMemo(()=>freestyleResults.filter(r=>r.passed&&!absentIds.has(r.id)).sort((a,b)=>b.total-a.total),[freestyleResults,absentIds]);
-  const passedB=useMemo(()=>baseResults.filter(r=>r.passed&&!absentIds.has(r.id)).sort((a,b)=>b.score-a.score),[baseResults,absentIds]);
+  const passedF=useMemo(()=>freestyleResults.filter(r=>!absentIds.has(r.id)).sort((a,b)=>b.total-a.total),[freestyleResults,absentIds]);
+  const passedB=useMemo(()=>baseResults.filter(r=>!absentIds.has(r.id)).sort((a,b)=>b.score-a.score),[baseResults,absentIds]);
 
   function getWinners(results,cats){
     return cats.map(cat=>{
