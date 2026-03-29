@@ -785,14 +785,17 @@ function ProtocolTab({freestyleResults,baseResults}){
     <div className="section-title">FREESTYLE</div>
     {sortedF.length===0?<div className="card"><div className="empty">Нет результатов freestyle</div></div>:
     <div className="card"><div className="table-wrap"><table>
-      <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Стат</th><th>Дин</th><th>Комбо</th><th>Унив</th><th>Креатив</th><th>Штрафы</th><th>Балл</th><th>Результат</th></tr></thead>
-      <tbody>{sortedF.map((r,i)=><tr key={i} className={r.passed?"row-pass":"row-fail"}>
+      <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Стат</th><th>Дин</th><th>Комбо</th><th>Унив</th><th>Креатив</th><th>Штрафы</th><th>Балл</th><th title="Мин. элементов разряда">Мин.эл</th><th title="Комбо из 3+ элементов">Комбо 3+</th><th title="Набрано / нужно баллов">Мин.балл</th><th>Результат</th></tr></thead>
+      <tbody>{sortedF.map((r,i)=>{const lvl=LEVELS.find(l=>l.name===r.level)||{minEl:0,minM:0,minF:0};const minScore=r.sex==="ж"?lvl.minF:lvl.minM;const scoreOk=r.total>=minScore;return <tr key={i} className={r.passed?"row-pass":"row-fail"}>
         <td>{r.id}</td><td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
         <td>{r.statika}</td><td>{r.dynamika}</td><td>{r.combo}</td><td>{r.universality}</td><td>{r.creative}</td>
         <td style={{color:"#ef4444"}}>{r.penalties>0?`-${r.penalties}`:""}{r.dsk?" ДСК":""}</td>
         <td style={{fontWeight:700,color:"#f59e0b"}}>{r.total}</td>
-        <td><span className={r.passed?"badge badge-pass":"badge badge-fail"}>{r.passed?"Сдал":"Не сдал"}</span></td>
-      </tr>)}</tbody>
+        <td style={{textAlign:"center"}}><span style={{color:r.minElCheck?"#22c55e":"#ef4444",fontWeight:700}}>{r.minElCheck?"✅":"❌"}</span><div style={{fontSize:10,color:"#64748b"}}>нужно {lvl.minEl}</div></td>
+        <td style={{textAlign:"center"}}><span style={{color:r.comboCheck?"#22c55e":"#ef4444",fontWeight:700}}>{r.comboCheck?"✅":"❌"}</span></td>
+        <td style={{textAlign:"center"}}><span style={{color:scoreOk?"#22c55e":"#ef4444",fontWeight:700}}>{scoreOk?"✅":"❌"}</span><div style={{fontSize:10,color:"#64748b"}}>{minScore}</div></td>
+        <td><span className={r.passed?"badge badge-pass":"badge badge-fail"}>{r.dsk?"ДСК":r.passed?"Сдал":"Не сдал"}</span></td>
+      </tr>})}</tbody>
     </table></div></div>}
 
     <div className="section-title">БАЗОВЫЕ</div>
@@ -948,11 +951,13 @@ function CertsTab({athletes,freestyleResults,baseResults}){
       </div>
       {fFailed.length===0?<div className="empty">—</div>:
       <div className="table-wrap"><table>
-        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень заявки</th><th>Статус</th></tr></thead>
-        <tbody>{fFailed.map((r,i)=><tr key={i}>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень заявки</th><th>Баллы</th><th>Причина</th><th>Статус</th></tr></thead>
+        <tbody>{fFailed.map((r,i)=>{const lvl=LEVELS.find(l=>l.name===r.level)||{minEl:0,minM:0,minF:0};const minScore=r.sex==="ж"?lvl.minF:lvl.minM;const reasons=[];if(r.dsk)reasons.push("ДСК");if(!r.comboCheck)reasons.push("нет комбо 3+");if(!r.minElCheck)reasons.push(`мин.эл (нужно ${lvl.minEl})`);if(r.total<minScore)reasons.push(`баллы ${r.total}/${minScore}`);return <tr key={i}>
           <td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
+          <td style={{color:"#f59e0b"}}>{r.total}</td>
+          <td style={{fontSize:12,color:"#ef4444"}}>{reasons.join(", ")||"—"}</td>
           <td><span className="badge" style={{background:"#94a3b822",color:"#94a3b8"}}>Грамота за участие</span></td>
-        </tr>)}</tbody>
+        </tr>})}</tbody>
       </table></div>}
     </div>
 
