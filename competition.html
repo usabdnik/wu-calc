@@ -296,7 +296,7 @@ function AthletesTab({athletes,setAthletes,clearResults}){
       const parts=line.split(";").map(s=>s.trim());
       if(parts.length<7)continue;
       const [id,group,name,sex,age,level,dir]=parts;
-      newAthletes.push({id,group,name,sex:sex.toLowerCase(),age:parseInt(age)||0,level,dir:dir.toLowerCase()});
+      newAthletes.push({id,group,name,sex:sex.toLowerCase(),age:parseInt(age)||0,level,dir:dir.toLowerCase(),present:true});
     }
     if(newAthletes.length>0){
       setAthletes(prev=>[...prev,...newAthletes]);
@@ -306,10 +306,12 @@ function AthletesTab({athletes,setAthletes,clearResults}){
 
   function addManual(){
     if(!form.name.trim())return;
-    const a={...form,id:form.id||String(Date.now()),age:parseInt(form.age)||0,sex:form.sex.toLowerCase(),dir:form.dir.toLowerCase()};
+    const a={...form,id:form.id||String(Date.now()),age:parseInt(form.age)||0,sex:form.sex.toLowerCase(),dir:form.dir.toLowerCase(),present:true};
     setAthletes(prev=>[...prev,a]);
     setForm({id:"",group:"",name:"",sex:"м",age:"",level:"SPIRIT 1 Biginner",dir:"base"});
   }
+
+  function togglePresent(idx){setAthletes(prev=>prev.map((a,i)=>i===idx?{...a,present:a.present===false?true:false}:a))}
 
   const [editIdx,setEditIdx]=useState(null);
   const [editData,setEditData]=useState({});
@@ -357,14 +359,15 @@ function AthletesTab({athletes,setAthletes,clearResults}){
 
     <div className="card">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <h3 style={{color:"#14b8a6"}}>Участники ({athletes.length})</h3>
+        <h3 style={{color:"#14b8a6"}}>Участники ({athletes.filter(a=>a.present!==false).length}/{athletes.length})</h3>
         {athletes.length>0&&<button className="btn btn-danger btn-sm" onClick={clearAll}>Очистить всех</button>}
       </div>
       {athletes.length===0?<div className="empty">Нет загруженных участников</div>:
       <div className="table-wrap"><table>
-        <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Пол</th><th>Лет</th><th>Уровень</th><th>Напр.</th><th></th></tr></thead>
+        <thead><tr><th>№</th><th>Явка</th><th>Гр</th><th>ФИО</th><th>Пол</th><th>Лет</th><th>Уровень</th><th>Напр.</th><th></th></tr></thead>
         <tbody>{athletes.map((a,i)=>editIdx===i?<tr key={i} style={{background:"#1e293b"}}>
           <td>{a.id}</td>
+          <td style={{textAlign:"center"}}><input type="checkbox" checked={editData.present!==false} onChange={e=>setEditData({...editData,present:e.target.checked})} style={{width:18,height:18,cursor:"pointer"}}/></td>
           <td><input style={{width:60,padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.group} onChange={e=>setEditData({...editData,group:e.target.value})}/></td>
           <td><input style={{width:"100%",padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.name} onChange={e=>setEditData({...editData,name:e.target.value})}/></td>
           <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.sex} onChange={e=>setEditData({...editData,sex:e.target.value})}><option value="м">М</option><option value="ж">Ж</option></select></td>
@@ -372,8 +375,10 @@ function AthletesTab({athletes,setAthletes,clearResults}){
           <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.level} onChange={e=>{const lv=e.target.value;setEditData({...editData,level:lv,dir:getDirForLevel(lv)})}}>{allLevelNames.map(l=><option key={l} value={l}>{l}</option>)}</select></td>
           <td><select style={{padding:4,background:"#0f172a",border:"1px solid #14b8a6",borderRadius:4,color:"#e2e8f0",fontSize:12}} value={editData.dir} onChange={e=>setEditData({...editData,dir:e.target.value})}><option value="freestyle">freestyle</option><option value="base">base</option></select></td>
           <td style={{whiteSpace:"nowrap"}}><button className="btn btn-primary btn-sm" onClick={saveEdit}>✓</button>{" "}<button className="btn btn-secondary btn-sm" onClick={cancelEdit}>✕</button></td>
-        </tr>:<tr key={i}>
-          <td>{a.id}</td><td>{a.group}</td><td>{a.name}</td>
+        </tr>:<tr key={i} style={a.present===false?{opacity:0.4}:{}}>
+          <td>{a.id}</td>
+          <td style={{textAlign:"center"}}><button onClick={()=>togglePresent(i)} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0}} title={a.present===false?"Отметить как явившегося":"Отметить как не явившегося"}>{a.present===false?"❌":"✅"}</button></td>
+          <td>{a.group}</td><td>{a.name}</td>
           <td><span className={(a.sex||"")=="ж"?"badge badge-female":"badge badge-male"}>{(a.sex||"?").toUpperCase()}</span></td>
           <td>{a.age}</td><td>{a.level}</td><td>{a.dir}</td>
           <td style={{whiteSpace:"nowrap"}}><button className="btn btn-secondary btn-sm" onClick={()=>startEdit(i)} style={{marginRight:4}}>✎</button><button className="btn btn-danger btn-sm" onClick={()=>removeAthlete(i)}>×</button></td>
@@ -412,7 +417,7 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
   const [vyh,setVyh]=useState(0);
 
   const filtered=useMemo(()=>{
-    return athletes.map((a,i)=>({...a,_idx:i})).filter(a=>filter==="all"||a.dir===filter);
+    return athletes.map((a,i)=>({...a,_idx:i})).filter(a=>a.present!==false&&(filter==="all"||a.dir===filter));
   },[athletes,filter]);
 
   const judgedIds=useMemo(()=>{
@@ -767,9 +772,10 @@ function AgeCatEditor({label,color,cats,setCats}){
   </div>;
 }
 
-function WinnersTab({freestyleResults,baseResults,ageCatsF,setAgeCatsF,ageCatsB,setAgeCatsB}){
-  const passedF=useMemo(()=>freestyleResults.filter(r=>r.passed).sort((a,b)=>b.total-a.total),[freestyleResults]);
-  const passedB=useMemo(()=>baseResults.filter(r=>r.passed).sort((a,b)=>b.score-a.score),[baseResults]);
+function WinnersTab({athletes,freestyleResults,baseResults,ageCatsF,setAgeCatsF,ageCatsB,setAgeCatsB}){
+  const absentIds=useMemo(()=>new Set(athletes.filter(a=>a.present===false).map(a=>a.id)),[athletes]);
+  const passedF=useMemo(()=>freestyleResults.filter(r=>r.passed&&!absentIds.has(r.id)).sort((a,b)=>b.total-a.total),[freestyleResults,absentIds]);
+  const passedB=useMemo(()=>baseResults.filter(r=>r.passed&&!absentIds.has(r.id)).sort((a,b)=>b.score-a.score),[baseResults,absentIds]);
 
   function getWinners(results,cats){
     return cats.map(cat=>{
@@ -816,11 +822,16 @@ function WinnersTab({freestyleResults,baseResults,ageCatsF,setAgeCatsF,ageCatsB,
 }
 
 /* ========== TAB 5: CERTIFICATES ========== */
-function CertsTab({freestyleResults,baseResults}){
-  const fPassed=useMemo(()=>freestyleResults.filter(r=>r.passed).sort((a,b)=>b.total-a.total),[freestyleResults]);
-  const fFailed=useMemo(()=>freestyleResults.filter(r=>!r.passed),[freestyleResults]);
-  const bPassed=useMemo(()=>baseResults.filter(r=>r.passed).sort((a,b)=>b.score-a.score),[baseResults]);
-  const bFailed=useMemo(()=>baseResults.filter(r=>!r.passed),[baseResults]);
+function CertsTab({athletes,freestyleResults,baseResults}){
+  const absentIds=useMemo(()=>new Set(athletes.filter(a=>a.present===false).map(a=>a.id)),[athletes]);
+  const fPresent=useMemo(()=>freestyleResults.filter(r=>!absentIds.has(r.id)),[freestyleResults,absentIds]);
+  const bPresent=useMemo(()=>baseResults.filter(r=>!absentIds.has(r.id)),[baseResults,absentIds]);
+  const fPassed=useMemo(()=>fPresent.filter(r=>r.passed).sort((a,b)=>b.total-a.total),[fPresent]);
+  const fFailed=useMemo(()=>fPresent.filter(r=>!r.passed),[fPresent]);
+  const bPassed=useMemo(()=>bPresent.filter(r=>r.passed).sort((a,b)=>b.score-a.score),[bPresent]);
+  const bFailed=useMemo(()=>bPresent.filter(r=>!r.passed),[bPresent]);
+  const fAbsent=useMemo(()=>freestyleResults.filter(r=>absentIds.has(r.id)),[freestyleResults,absentIds]);
+  const bAbsent=useMemo(()=>baseResults.filter(r=>absentIds.has(r.id)),[baseResults,absentIds]);
 
   function copyList(items,type){
     let txt="";
@@ -899,6 +910,22 @@ function CertsTab({freestyleResults,baseResults}){
         </tr>)}</tbody>
       </table></div>}
     </div>
+
+    {(fAbsent.length>0||bAbsent.length>0)&&<>
+    <div className="section-title" style={{color:"#64748b"}}>НЕ ЯВИЛИСЬ</div>
+    <div className="card" style={{opacity:0.6}}>
+      {fAbsent.length>0&&<><h4 style={{color:"#64748b",marginBottom:8}}>Freestyle ({fAbsent.length})</h4>
+      <div className="table-wrap" style={{marginBottom:12}}><table>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень</th></tr></thead>
+        <tbody>{fAbsent.map((r,i)=><tr key={i}><td>{r.group}</td><td>{r.name}</td><td>{r.level}</td></tr>)}</tbody>
+      </table></div></>}
+      {bAbsent.length>0&&<><h4 style={{color:"#64748b",marginBottom:8}}>Base ({bAbsent.length})</h4>
+      <div className="table-wrap"><table>
+        <thead><tr><th>Гр</th><th>ФИО</th><th>Уровень</th></tr></thead>
+        <tbody>{bAbsent.map((r,i)=><tr key={i}><td>{r.group}</td><td>{r.name}</td><td>{r.level}</td></tr>)}</tbody>
+      </table></div>}
+    </div>
+    </>}
   </div>;
 }
 
@@ -1237,8 +1264,8 @@ function App(){
       {tab===0&&<AthletesTab athletes={athletes} setAthletes={setAthletes} clearResults={()=>{setFreestyleResults([]);setBaseResults([])}}/>}
       {tab===1&&<JudgingTab athletes={athletes} freestyleResults={freestyleResults} setFreestyleResults={setFreestyleResults} baseResults={baseResults} setBaseResults={setBaseResults} toast={showToast}/>}
       {tab===2&&<ProtocolTab freestyleResults={freestyleResults} baseResults={baseResults}/>}
-      {tab===3&&<WinnersTab freestyleResults={freestyleResults} baseResults={baseResults} ageCatsF={ageCatsF} setAgeCatsF={setAgeCatsF} ageCatsB={ageCatsB} setAgeCatsB={setAgeCatsB}/>}
-      {tab===4&&<CertsTab freestyleResults={freestyleResults} baseResults={baseResults}/>}
+      {tab===3&&<WinnersTab athletes={athletes} freestyleResults={freestyleResults} baseResults={baseResults} ageCatsF={ageCatsF} setAgeCatsF={setAgeCatsF} ageCatsB={ageCatsB} setAgeCatsB={setAgeCatsB}/>}
+      {tab===4&&<CertsTab athletes={athletes} freestyleResults={freestyleResults} baseResults={baseResults}/>}
     </div>
 
     <div className="footer">Калькулятор для спортсменов &rarr; <a href="index.html">index.html</a></div>
