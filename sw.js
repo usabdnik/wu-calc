@@ -1,7 +1,8 @@
-const CACHE = 'wu-calc-v3';
+const CACHE = 'wu-calc-v4';
 const URLS = [
   './',
   './index.html',
+  './judge.html',
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
   'https://unpkg.com/@babel/standalone/babel.min.js'
