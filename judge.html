@@ -191,10 +191,19 @@ async function whisperTranscribe(audioBlob){
   const fd=new FormData();
   fd.append("audio",audioBlob,"audio.webm");
   fd.append("api_key",cfg.key);
-  const resp=await fetch(cfg.url+"/api/ai/transcribe",{method:"POST",body:fd});
-  if(!resp.ok)throw new Error("Whisper: "+resp.status);
-  const data=await resp.json();
-  return data.text||"";
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),30000);
+  try{
+    const resp=await fetch(cfg.url+"/api/ai/transcribe",{method:"POST",body:fd,signal:ctrl.signal});
+    clearTimeout(timer);
+    if(!resp.ok)throw new Error("Whisper: "+resp.status);
+    const data=await resp.json();
+    return data.text||"";
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==="AbortError")throw new Error("Слабый интернет — попробуйте позже");
+    throw e;
+  }
 }
 
 /* ── AI defaults init ── */
