@@ -74,7 +74,7 @@ function useVoiceSearch(){
   const available=!!navigator.mediaDevices;
   const start=useCallback((onResult)=>{
     if(!navigator.mediaDevices)return;cbRef.current=onResult;
-    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(stream=>{
       const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
       chRef.current=[];
       mr.ondataavailable=e=>{if(e.data.size>0)chRef.current.push(e.data);};
@@ -228,7 +228,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const requestMic=async()=>{
     try{
       setStatus("Запрашиваю микрофон...");
-      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
       stream.getTracks().forEach(t=>t.stop());
       setMicOk(true);setStatus("Микрофон разрешён");return true;
     }catch(e){
@@ -243,7 +243,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const start=async()=>{
     if(micOk!==true){const ok=await requestMic();if(!ok)return;}
     try{
-      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
       const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
       chunks.current=[];
       mr.ondataavailable=e=>{if(e.data.size>0)chunks.current.push(e.data);};
