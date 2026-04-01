@@ -515,7 +515,7 @@ function sendToProtocol(athlete,data){
 /* ── Main App ── */
 function App(){
   const[li,setLi]=useState(4);const[g,setG]=useState("M");const[slots,setSlots]=useState([[]]);
-  const[showR,setShowR]=useState(false);const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);
+  const[showR,setShowR]=useState(false);const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);const[showBreak,setShowBreak]=useState(false);
   const[penalties,setPenalties]=useState({dirty:0,fall:0,dq:false});
   const[selAthlete,setSelAthlete]=useState("");
   const[protocolSent,setProtocolSent]=useState("");
@@ -546,8 +546,11 @@ function App(){
   const lv=LEVELS[li];const minS=g==="M"?lv.minM:lv.minF;
   const allRaw=useMemo(()=>slots.flat(),[slots]);
   const all=useMemo(()=>{const seen=new Set();return allRaw.filter(e=>{if(seen.has(e.name))return false;seen.add(e.name);return true;});},[allRaw]);
+  const scoreLo=lv.num-1;const scoreHi=lv.num+2.5;
+  const credited=all.filter(e=>e.score>=scoreLo&&e.score<=scoreHi);
+  const excluded=all.filter(e=>e.score<scoreLo||e.score>scoreHi);
   const sC=all.filter(e=>e.cat==="Статика").length;const dC=all.filter(e=>e.cat==="Динамика").length;
-  const raw=all.reduce((s,e)=>s+e.score,0);const b=bal(sC,dC,lv.num);
+  const raw=credited.reduce((s,e)=>s+e.score,0);const b=bal(sC,dC,lv.num);
   const penaltyScore=penalties.dirty*2+penalties.fall*4;
   const tot=raw+b-penaltyScore;
   const comboOk=slots.some(s=>s.length>=3);
@@ -586,13 +589,58 @@ function App(){
       <div style={{display:"grid",gridTemplateColumns:(penaltyScore>0||penalties.dq)?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:12,marginTop:16}}>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{raw.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Элементы</div></div>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:b>0?"#14b8a6":"#64748b"}}>+{b.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Баланс</div></div>
-        <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{all.length}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Кол-во</div></div>
+        <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{excluded.length>0?credited.length+"/"+all.length:all.length}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>{excluded.length>0?"Засчит.":"Кол-во"}</div></div>
         {(penaltyScore>0||penalties.dq)&&<div style={{textAlign:"center",padding:"10px 0",background:"rgba(239,68,68,0.1)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#ef4444"}}>{penalties.dq?"ДСК":"−"+penaltyScore}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Штрафы</div></div>}
       </div>
       <div style={{marginTop:16}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}><span style={{color:"#14b8a6"}}>Статика: {sC}</span><span style={{color:"#64748b"}}>Баланс</span><span style={{color:"#f59e0b"}}>Динамика: {dC}</span></div><div style={{height:6,background:"#0f172a",borderRadius:3,display:"flex",overflow:"hidden"}}>{(sC+dC)>0&&<><div style={{width:`${sC/(sC+dC)*100}%`,background:"#14b8a6",borderRadius:3,transition:"width 0.5s"}}/><div style={{width:`${dC/(sC+dC)*100}%`,background:"#f59e0b",borderRadius:3,transition:"width 0.5s"}}/></>}</div></div>
     </div>
 
     <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>{[[sOk,`Баллы ${sOk?">=":"<"} ${minS}`,minS>0],[comboOk,`Связка 3+ эл.: ${comboOk?"Да":"Нет"}`,true],[eOk,`Эл. ${lv.num} разр.: ${ownLevelCount}/${lv.minEl}+`,lv.minEl>0]].filter(x=>x[2]).map(([ok,t],i)=>(<div key={i} style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:ok?"rgba(20,184,166,0.12)":"rgba(239,68,68,0.12)",color:ok?"#14b8a6":"#ef4444",border:`1px solid ${ok?"rgba(20,184,166,0.3)":"rgba(239,68,68,0.3)"}`}}>{ok?"✓":"✗"} {t}</div>))}</div>
+
+    {all.length>0&&<><button onClick={()=>setShowBreak(!showBreak)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Расшифровка баллов</span><span style={{transform:showBreak?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
+    {showBreak&&<div style={{padding:16,background:"#0f172a",border:"1px solid #334155",borderRadius:12,marginBottom:12,fontSize:12}}>
+      <div style={{color:"#64748b",marginBottom:4}}>Диапазон засчитанных: <b style={{color:"#e2e8f0"}}>{scoreLo} — {scoreHi} баллов</b></div>
+      <div style={{color:"#64748b",marginBottom:12}}>Баланс считается по <b style={{color:"#e2e8f0"}}>всем</b> уникальным элементам ({all.length} шт.)</div>
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr style={{borderBottom:"1px solid #334155"}}>
+          <th style={{textAlign:"left",padding:"4px 6px",color:"#64748b",fontWeight:500}}>Элемент</th>
+          <th style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontWeight:500,width:40}}>Балл</th>
+          <th style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontWeight:500,width:60}}>Тип</th>
+          <th style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontWeight:500,width:30}}></th>
+        </tr></thead>
+        <tbody>
+          {credited.map(e=>(<tr key={e.name} style={{borderBottom:"1px solid #1e293b"}}>
+            <td style={{padding:"4px 6px",color:"#e2e8f0"}}>{e.name}</td>
+            <td style={{textAlign:"center",padding:"4px 6px",color:"#14b8a6",fontWeight:600}}>{e.score}</td>
+            <td style={{textAlign:"center",padding:"4px 6px",color:e.cat==="Статика"?"#14b8a6":"#f59e0b",fontSize:10}}>{e.cat==="Статика"?"Стат":"Дин"}</td>
+            <td style={{textAlign:"center",color:"#22c55e"}}>+</td>
+          </tr>))}
+          {excluded.map(e=>(<tr key={e.name} style={{borderBottom:"1px solid #1e293b",opacity:0.5}}>
+            <td style={{padding:"4px 6px",color:"#ef4444",textDecoration:"line-through"}}>{e.name}</td>
+            <td style={{textAlign:"center",padding:"4px 6px",color:"#ef4444"}}>{e.score}</td>
+            <td style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontSize:10}}>{e.cat==="Статика"?"Стат":"Дин"}</td>
+            <td style={{textAlign:"center",color:"#ef4444",fontSize:10}}>вне</td>
+          </tr>))}
+        </tbody>
+      </table>
+      <div style={{borderTop:"1px solid #334155",marginTop:8,paddingTop:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",color:"#94a3b8",marginBottom:2}}>
+          <span>Засчитанные элементы</span><span style={{color:"#e2e8f0",fontWeight:600}}>{raw.toFixed(1)}</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",color:"#94a3b8",marginBottom:2}}>
+          <span>Баланс (стат:{sC} / дин:{dC})</span><span style={{color:"#14b8a6",fontWeight:600}}>+{b.toFixed(2)}</span>
+        </div>
+        {penaltyScore>0&&<div style={{display:"flex",justifyContent:"space-between",color:"#94a3b8",marginBottom:2}}>
+          <span>Штрафы</span><span style={{color:"#ef4444",fontWeight:600}}>−{penaltyScore}</span>
+        </div>}
+        <div style={{display:"flex",justifyContent:"space-between",color:"#e2e8f0",fontWeight:700,borderTop:"1px solid #334155",paddingTop:4,marginTop:4}}>
+          <span>ИТОГО</span><span>{tot.toFixed(2)}</span>
+        </div>
+      </div>
+      {excluded.length>0&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(239,68,68,0.08)",borderRadius:8,color:"#f59e0b",fontSize:11}}>
+        {excluded.length} эл. вне диапазона [{scoreLo}–{scoreHi}]: не засчитаны в сумму, но учтены в балансе
+      </div>}
+    </div>}</>}
 
     <button onClick={()=>setShowR(!showR)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Нормативы: {lv.name}</span><span style={{transform:showR?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
     {showR&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>{reqs.map(r=>(<div key={r.l} style={{padding:"12px",background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0"}}>{r.l}</div><div style={{fontSize:20,fontWeight:700,color:"#14b8a6",marginTop:2}}>{r.v}</div></div>))}</div>}
@@ -652,8 +700,8 @@ function App(){
       }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",background:"rgba(20,184,166,0.1)",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer"}}>📋 Протокол</button>
       {selAthlete&&<button onClick={()=>{
         const a=compAthletes.find(x=>x.id===selAthlete);if(!a)return;
-        const statika=all.filter(e=>e.cat==="Статика").reduce((s,e)=>s+e.score,0);
-        const dynamika=all.filter(e=>e.cat==="Динамика").reduce((s,e)=>s+e.score,0);
+        const statika=credited.filter(e=>e.cat==="Статика").reduce((s,e)=>s+e.score,0);
+        const dynamika=credited.filter(e=>e.cat==="Динамика").reduce((s,e)=>s+e.score,0);
         sendToProtocol(a,{statika,dynamika,combo:Math.round(b*100)/100,universality:0,creative:0,dirty:penalties.dirty,fall:penalties.fall,dsk:penalties.dq,comboCheck:comboOk,minElCheck:eOk,penalties:penaltyScore,total:Math.round(tot*100)/100,passed:allOk});
         setProtocolSent("Отправлено в протокол: "+a.name+" — "+tot.toFixed(1)+" б.");
         setTimeout(()=>setProtocolSent(""),4000);
