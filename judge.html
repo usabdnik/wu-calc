@@ -209,6 +209,41 @@ async function whisperTranscribe(audioBlob){
   }
 }
 
+/* ── voice_logs telemetry client (fire-and-forget) ── */
+const APP_VERSION="wu-2026.04.17-x7k";
+function getVoiceDeviceId(){
+  let id=null;try{id=localStorage.getItem("comp_device_id");}catch(e){}
+  if(!id){id="dev-"+Math.random().toString(36).slice(2,10)+"-"+Date.now().toString(36);try{localStorage.setItem("comp_device_id",id);}catch(e){}}
+  return id;
+}
+function getCurrentEventId(){try{const m=JSON.parse(localStorage.getItem("comp_sync_meta")||"null");return m&&m.event_id||null;}catch(e){return null;}}
+function buildVoiceLogPayload({source,whisper_text,ai_parsed,parsed,duration_ms}){
+  const mapped_elements=[];const unmatched_phrases=[];
+  if(parsed){parsed.forEach(({sl,ms})=>ms.forEach(({q,m,el})=>{
+    if(el){mapped_elements.push({q:String(q||"").slice(0,500),matched_el:el.name,score:m&&typeof m.s==="number"?m.s:null,strategy:m&&m.ex?"exact":"fuzzy",slot:sl});}
+    else{unmatched_phrases.push(String(q||"").slice(0,500));}
+  }));}
+  /* backend limits: whisper_text ≤8000, unmatched_phrases ≤200, duration_ms 0..600000, source whitelist */
+  const src=(source==="index"||source==="judge")?source:null;
+  const dur=duration_ms!=null?Math.max(0,Math.min(600000,Math.round(duration_ms))):null;
+  return{device_id:getVoiceDeviceId(),event_id:getCurrentEventId(),source:src,whisper_text:String(whisper_text||"").slice(0,8000),whisper_segments:null,ai_parsed:ai_parsed||null,mapped_elements,unmatched_phrases:unmatched_phrases.slice(0,200),duration_ms:dur,app_version:APP_VERSION};
+}
+async function postVoiceLog(payload){
+  const cfg=LS.get("wu-ai")||{};if(!cfg.url||!cfg.key)return null;
+  try{
+    const r=await fetch(cfg.url+"/api/ai/voice_logs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...payload,api_key:cfg.key})});
+    if(!r.ok)return null;
+    const d=await r.json();return d&&d.id||null;
+  }catch(e){console.warn("voice_log post failed:",e);return null;}
+}
+async function postVoiceFlag(id,user_flag,user_corrections){
+  if(!id)return;
+  const cfg=LS.get("wu-ai")||{};if(!cfg.url||!cfg.key)return;
+  try{
+    await fetch(cfg.url+"/api/ai/voice_logs/"+encodeURIComponent(id)+"/flag",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_flag,user_corrections:user_corrections||null,api_key:cfg.key})});
+  }catch(e){console.warn("voice_flag post failed:",e);}
+}
+
 /* ── AI defaults init ── */
 (function(){const s=LS.get("wu-ai");if(!s||!s.url||!s.key)LS.set("wu-ai",{url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});})();
 
@@ -257,8 +292,14 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const[micOk,setMicOk]=useState(null);
   const[lastResult,setLastResult]=useState(null);
   const[showReview,setShowReview]=useState(false);
+  const[lastVoiceLogId,setLastVoiceLogId]=useState(null);
+  const[feedbackAck,setFeedbackAck]=useState(false);
   const mediaRec=useRef(null);const chunks=useRef([]);
   const canvasRef=useRef(null);const rafRef=useRef(null);const audioCtxRef=useRef(null);
+  const recordingStartedAt=useRef(null);
+  const lastApplyAt=useRef(0);
+  const lastWhisperText=useRef("");
+  const lastAiParsed=useRef(null);
   const sidx=useMemo(()=>buildIdx(ELS,synonyms),[synonyms]);
 
   const startViz=(stream)=>{
@@ -303,11 +344,18 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 
   const start=async()=>{
     if(micOk!==true){const ok=await requestMic();if(!ok)return;}
+    /* retry detection: <5 сек после успешного apply + есть lastVoiceLogId → flag retry */
+    if(lastVoiceLogId&&lastApplyAt.current&&(Date.now()-lastApplyAt.current<5000)){
+      const idToFlag=lastVoiceLogId;
+      postVoiceFlag(idToFlag,"retry");
+      setLastVoiceLogId(null);
+    }
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
       startViz(stream);
       const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
       chunks.current=[];
+      recordingStartedAt.current=Date.now();
       mr.ondataavailable=e=>{if(e.data.size>0)chunks.current.push(e.data);};
       mr.onstop=async()=>{
         stopViz();
@@ -315,7 +363,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
         const blob=new Blob(chunks.current,{type:mr.mimeType});
         if(blob.size<100){setStatus("Запись слишком короткая");setOn(false);return;}
         setStatus("Распознаю речь (Whisper)...");
-        try{const text=await whisperTranscribe(blob);if(text.trim()){setTx(prev=>(prev?prev+" ":"")+text.trim());setStatus("Распознано");}else{setStatus("Речь не распознана");}}
+        try{const text=await whisperTranscribe(blob);if(text.trim()){lastWhisperText.current=text.trim();setTx(prev=>(prev?prev+" ":"")+text.trim());setStatus("Распознано");}else{setStatus("Речь не распознана");}}
         catch(e){setStatus("Ошибка: "+e.message);}
         setOn(false);
       };
@@ -339,6 +387,12 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     const chunks=parseVoice(tx);
     const res=chunks.map(({sl,raw})=>{const qs=smartSplit(raw,sidx);const ms=qs.map(q=>{const m=findBest(q,sidx);return{q,m,el:m?.el||null};});return{sl,ms};});
     setParsed(res);
+    /* fire-and-forget: log voice flow only (recording was started → tx came from Whisper) */
+    if(recordingStartedAt.current){
+      const dur=Date.now()-recordingStartedAt.current;
+      const payload=buildVoiceLogPayload({source:"judge",whisper_text:lastWhisperText.current||tx,ai_parsed:null,parsed:res,duration_ms:dur});
+      postVoiceLog(payload).then(id=>{if(id)setLastVoiceLogId(id);});
+    }
   },[tx,sidx,onPenalty]);
 
   const unr=useMemo(()=>{if(!parsed)return[];const it=[];parsed.forEach((c,ci)=>c.ms.forEach((m,mi)=>{if(!m.el)it.push({ci,mi,q:m.q});}));return it;},[parsed]);
@@ -348,9 +402,12 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const startEdit=(ci,mi,q)=>{setEditCI(ci);setEditMI(mi);setEditSq(q);setUri(null);setSq("");};
   const applyEdit=(el)=>{
     const origQ=parsed[editCI]?.ms[editMI]?.q;
+    const wasMatched=!!parsed[editCI]?.ms[editMI]?.el;
     if(origQ&&!parsed[editCI].ms[editMI].el){onAddSyn(origQ,el.name);}
     setParsed(parsed.map((c,i)=>i!==editCI?c:{...c,ms:c.ms.map((m,j)=>j!==editMI?m:{...m,el,m:{el,s:1,ex:true}})}));
     setEditCI(null);setEditMI(null);setEditSq("");
+    /* user correction → flag corrected */
+    if(lastVoiceLogId&&origQ){postVoiceFlag(lastVoiceLogId,"corrected",{q:origQ,from:wasMatched?(parsed[editCI].ms[editMI].el?.name||null):null,to:el.name});}
   };
   const cancelEdit=()=>{setEditCI(null);setEditMI(null);setEditSq("");};
   const removeEl=(ci,mi)=>{setParsed(parsed.map((c,i)=>i!==ci?c:{...c,ms:c.ms.filter((_,j)=>j!==mi)}));};
@@ -363,6 +420,8 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     const q=parsed[ci].ms[mi].q;onAddSyn(q,el.name);
     setParsed(parsed.map((c,i)=>i!==ci?c:{...c,ms:c.ms.map((m,j)=>j!==mi?m:{...m,el,m:{el,s:1,ex:true}})}));
     setUri(null);setSq("");
+    /* unmatched phrase resolved → flag corrected */
+    if(lastVoiceLogId){postVoiceFlag(lastVoiceLogId,"corrected",{q,from:null,to:el.name});}
   };
 
   const apply=()=>{
@@ -374,6 +433,8 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     setLastResult({text:srcText,matched,missed,slots:parsed.map(p=>p.sl)});
     setShowReview(missed.length>0);
     onApply(ns);setParsed(null);setTx("");setTi("");
+    /* mark apply timestamp for retry detection */
+    lastApplyAt.current=Date.now();
   };
 
   const fEls=useMemo(()=>sq?ELS.filter(e=>norm(e.name).includes(norm(sq))).slice(0,30):ELS.slice(0,30),[sq]);
@@ -382,10 +443,12 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 
   const processAI=async(text)=>{
     const src=text||(tx||ti).trim();if(!src){setStatus("Нет текста");return;}
+    const isVoiceFlow=!text&&!!tx&&!!recordingStartedAt.current;
     setAiLoading(true);setStatus("AI анализирует...");
     try{
       const data=await aiParse(src);
       if(data.elements&&data.elements.length){
+        lastAiParsed.current=data;
         const voiceChunks=parseVoice(src);
         const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
         if(voiceChunks.length>1||voiceChunks[0].sl!==0||voiceChunks.length===1&&voiceChunks[0].raw!==src.trim()){
@@ -415,8 +478,11 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
           const res=Object.entries(buckets).filter(([_,ms])=>ms.length>0).map(([sl,ms])=>({sl:parseInt(sl),ms}));
           res.sort((a,b)=>a.sl-b.sl);
           setParsed(res);
+          if(isVoiceFlow){const dur=Date.now()-recordingStartedAt.current;const payload=buildVoiceLogPayload({source:"judge",whisper_text:lastWhisperText.current||src,ai_parsed:data,parsed:res,duration_ms:dur});postVoiceLog(payload).then(id=>{if(id)setLastVoiceLogId(id);});}
         }else{
-          setParsed([{sl:0,ms:aiEls}]);
+          const single=[{sl:0,ms:aiEls}];
+          setParsed(single);
+          if(isVoiceFlow){const dur=Date.now()-recordingStartedAt.current;const payload=buildVoiceLogPayload({source:"judge",whisper_text:lastWhisperText.current||src,ai_parsed:data,parsed:single,duration_ms:dur});postVoiceLog(payload).then(id=>{if(id)setLastVoiceLogId(id);});}
         }
         setStatus("AI нашёл "+data.elements.length+" элементов");
       }else{setStatus("AI не нашёл элементов");}
@@ -482,7 +548,15 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
         <button onClick={cancelEdit} style={{marginTop:8,padding:"6px 14px",borderRadius:8,border:"1px solid #334155",background:"#1e293b",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Отмена</button>
       </div>)}
 
-      {editCI===null&&unr.length===0&&parsed.some(c=>c.ms.some(m=>m.el))&&(<button onClick={apply} style={{marginTop:12,width:"100%",padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:"linear-gradient(135deg,#14b8a6,#0d9488)",color:"#020617"}}>Применить связки</button>)}
+      {editCI===null&&unr.length===0&&parsed.some(c=>c.ms.some(m=>m.el))&&(<div style={{marginTop:12,display:"flex",gap:8,alignItems:"stretch"}}>
+        <button onClick={apply} style={{flex:1,padding:"12px",borderRadius:12,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:"linear-gradient(135deg,#14b8a6,#0d9488)",color:"#020617"}}>Применить связки</button>
+        <button
+          onClick={()=>{if(!lastVoiceLogId||feedbackAck)return;postVoiceFlag(lastVoiceLogId,'bad');setFeedbackAck(true);setTimeout(()=>setFeedbackAck(false),2000);}}
+          disabled={!lastVoiceLogId||feedbackAck}
+          title={lastVoiceLogId?"Сообщить, что распознано неверно":"Лог недоступен"}
+          style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+(feedbackAck?"#22c55e":"#3a3a3a"),background:"transparent",color:feedbackAck?"#22c55e":"#8a8a8a",fontSize:12,fontWeight:500,cursor:lastVoiceLogId&&!feedbackAck?"pointer":"not-allowed",opacity:lastVoiceLogId?1:0.5,whiteSpace:"nowrap",transition:"all .2s"}}
+        >{feedbackAck?"Спасибо, учтём":"✍ исправить"}</button>
+      </div>)}
       {unr.length>0&&(<div style={{marginTop:8,fontSize:12,color:"#f59e0b",textAlign:"center"}}>Осталось определить: {unr.length} элемент(ов)</div>)}
     </div>)}
 

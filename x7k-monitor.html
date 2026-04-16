@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0b0f14">
+<title>vlogs.x7k</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:#0b0f14;color:#cfd8dc;font-family:'JetBrains Mono','Fira Code','SF Mono','Menlo','Courier New',monospace;font-size:13px;line-height:1.45;min-height:100vh}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#0b0f14}
+::-webkit-scrollbar-thumb{background:#1f2933;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#2d3b4a}
+input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit}
+a{color:#5fb3d9;text-decoration:none}
+a:hover{text-decoration:underline}
+
+.hdr{background:#0f141a;border-bottom:1px solid #1f2933;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.hdr h1{font-size:13px;font-weight:600;color:#7fd6a0;letter-spacing:1px}
+.hdr h1 .dot{color:#ef5350;animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hdr-r{display:flex;align-items:center;gap:12px;font-size:11px;color:#78909c}
+
+.box{background:#0f141a;border:1px solid #1f2933;border-radius:4px;padding:12px;margin:12px 0}
+.box-title{font-size:11px;color:#78909c;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+
+.container{max-width:1400px;margin:0 auto;padding:0 16px 32px}
+
+input[type="text"],input[type="password"],select{background:#0b0f14;border:1px solid #1f2933;border-radius:3px;padding:6px 10px;color:#cfd8dc;outline:none;width:100%;transition:border-color .15s}
+input:focus,select:focus{border-color:#5fb3d9}
+input::placeholder{color:#455a64}
+
+.btn{background:#1f2933;border:1px solid #2d3b4a;color:#cfd8dc;padding:6px 14px;border-radius:3px;cursor:pointer;font-weight:500;transition:all .15s;white-space:nowrap}
+.btn:hover{background:#2d3b4a;border-color:#5fb3d9}
+.btn-primary{background:#1e3a5f;border-color:#2d5d8a;color:#bfe2ff}
+.btn-primary:hover{background:#2d5d8a;border-color:#5fb3d9}
+.btn-danger{background:#3d1f24;border-color:#5d2c33;color:#ff8a80}
+.btn-danger:hover{background:#5d2c33;border-color:#ef5350}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fld{display:flex;flex-direction:column;gap:3px;min-width:120px}
+.fld label{font-size:10px;color:#78909c;text-transform:uppercase;letter-spacing:1px}
+.fld.grow{flex:1}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#0b0f14;color:#78909c;font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid #1f2933;text-transform:uppercase;font-size:10px;letter-spacing:1px;white-space:nowrap;position:sticky;top:0}
+td{padding:6px 10px;border-bottom:1px solid #1f2933;vertical-align:top}
+tr.row-clickable{cursor:pointer}
+tr.row-clickable:hover{background:#1f293355}
+.tbl-wrap{overflow:auto;max-height:70vh;border:1px solid #1f2933;border-radius:3px}
+
+.flag{display:inline-block;padding:1px 6px;border-radius:2px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.flag-bad{background:#3d1f24;color:#ff8a80}
+.flag-good{background:#1f3d2a;color:#7fd6a0}
+.flag-corrected{background:#3d3520;color:#ffd54f}
+.flag-retry{background:#3d2a3d;color:#ce93d8}
+.flag-null{color:#455a64}
+
+.mono-num{color:#5fb3d9;font-variant-numeric:tabular-nums}
+.txt-muted{color:#78909c}
+.txt-dim{color:#455a64}
+.txt-trunc{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom}
+.txt-quote{color:#cfd8dc;font-style:italic}
+
+.empty,.loading,.err{text-align:center;padding:40px 20px;color:#78909c;font-size:12px}
+.err{color:#ff8a80}
+.loading::after{content:'...';animation:dots 1.2s infinite}
+@keyframes dots{0%,20%{content:''}40%{content:'.'}60%{content:'..'}80%,100%{content:'...'}}
+
+.modal-bk{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:#0f141a;border:1px solid #2d3b4a;border-radius:4px;max-width:1100px;width:100%;max-height:90vh;display:flex;flex-direction:column}
+.modal-hd{padding:12px 16px;border-bottom:1px solid #1f2933;display:flex;justify-content:space-between;align-items:center}
+.modal-hd h2{font-size:12px;color:#7fd6a0;text-transform:uppercase;letter-spacing:1px}
+.modal-bd{padding:16px;overflow:auto;flex:1}
+.modal-bd .json-block{background:#0b0f14;border:1px solid #1f2933;border-radius:3px;padding:10px;margin:8px 0;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto}
+.modal-bd .sec-title{font-size:10px;color:#78909c;text-transform:uppercase;letter-spacing:1.2px;margin:14px 0 4px}
+.modal-bd .sec-title:first-child{margin-top:0}
+.modal-x{background:none;border:none;color:#78909c;cursor:pointer;font-size:18px;padding:0 4px;line-height:1}
+.modal-x:hover{color:#ef5350}
+
+.kv{display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-size:11px}
+.kv .k{color:#78909c;text-transform:uppercase;font-size:10px;letter-spacing:.8px}
+.kv .v{color:#cfd8dc;word-break:break-word}
+
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1e3a5f;color:#bfe2ff;border:1px solid #2d5d8a;padding:8px 18px;border-radius:3px;font-size:12px;z-index:300;animation:fadeIn .2s}
+.toast-err{background:#3d1f24;border-color:#5d2c33;color:#ff8a80}
+
+@media(max-width:640px){
+  .container{padding:0 8px 24px}
+  .hdr{padding:8px 10px}
+  .hdr h1{font-size:11px}
+  .fld{min-width:100%}
+  th,td{padding:5px 6px;font-size:10px}
+  .modal{max-height:96vh}
+}
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+const API_BASE='https://api.workoutudm.ru/api/ai/voice_logs';
+const KEY_STORAGE='wu-admin-key';
+const APP_VERSION='x7k-0.1.0';
+
+/* ========== mock data (используется пока endpoint недоступен) ========== */
+const MOCK_LOGS=[
+  {
+    id:'mock-1',
+    created_at:new Date(Date.now()-1000*60*5).toISOString(),
+    device_id:'dev-aaa-111',
+    event_id:'test-event-001',
+    source:'index',
+    whisper_text:'передний вис, флажок, выход силой две руки, подъём переворотом',
+    whisper_segments:[{text:'передний вис',no_speech_prob:0.02,avg_logprob:-0.18}],
+    ai_parsed:{elements:['передний вис','флажок','выход силой','подъём переворотом'],raw:'mock'},
+    mapped_elements:[
+      {q:'передний вис',matched_el:'Передний вис',score:0.96,strategy:'exact'},
+      {q:'флажок',matched_el:'Флаг',score:0.78,strategy:'fuzzy'},
+      {q:'выход силой две руки',matched_el:'Выход силой 2 руки',score:0.91,strategy:'normalized'}
+    ],
+    unmatched_phrases:['подъём переворотом'],
+    user_corrections:null,
+    user_flag:null,
+    duration_ms:4823,
+    app_version:'wu-2026.04.16-91b6f92'
+  },
+  {
+    id:'mock-2',
+    created_at:new Date(Date.now()-1000*60*30).toISOString(),
+    device_id:'dev-bbb-222',
+    event_id:'test-event-002',
+    source:'judge',
+    whisper_text:'горизонт, ласточка, печатная машинка',
+    whisper_segments:[{text:'горизонт',no_speech_prob:0.05,avg_logprob:-0.22}],
+    ai_parsed:{elements:['горизонт','ласточка','печатная машинка']},
+    mapped_elements:[
+      {q:'горизонт',matched_el:'Горизонт',score:0.99,strategy:'exact'}
+    ],
+    unmatched_phrases:['ласточка','печатная машинка'],
+    user_corrections:{q:'ласточка',old_match:null,new_match:'Ласточка'},
+    user_flag:'corrected',
+    duration_ms:3210,
+    app_version:'wu-2026.04.16-91b6f92'
+  },
+  {
+    id:'mock-3',
+    created_at:new Date(Date.now()-1000*60*60*2).toISOString(),
+    device_id:'dev-aaa-111',
+    event_id:'test-event-001',
+    source:'index',
+    whisper_text:'привет пацаны',
+    whisper_segments:[{text:'привет пацаны',no_speech_prob:0.85,avg_logprob:-1.3}],
+    ai_parsed:null,
+    mapped_elements:[],
+    unmatched_phrases:['привет пацаны'],
+    user_corrections:null,
+    user_flag:'bad',
+    duration_ms:1500,
+    app_version:'wu-2026.04.16-91b6f92'
+  }
+];
+
+/* ========== utils ========== */
+function fmtDate(iso){
+  if(!iso) return '—';
+  try{
+    const d=new Date(iso);
+    const pad=n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }catch{ return iso; }
+}
+function trunc(s,n=60){
+  if(!s) return '';
+  return s.length>n ? s.slice(0,n)+'…' : s;
+}
+function flagClass(f){
+  if(!f) return 'flag-null';
+  return 'flag-'+f;
+}
+function flagLabel(f){
+  if(!f) return '·';
+  return f;
+}
+function safeJSON(v){
+  try{ return JSON.stringify(v,null,2); }catch{ return String(v); }
+}
+
+/* ========== api ========== */
+async function apiRecent({key,limit,flag,source,device_id,signal}){
+  const u=new URL(API_BASE+'/recent');
+  u.searchParams.set('limit',String(limit||50));
+  if(flag&&flag!=='all') u.searchParams.set('flag',flag);
+  if(source&&source!=='all') u.searchParams.set('source',source);
+  if(device_id) u.searchParams.set('device_id',device_id);
+  const r=await fetch(u.toString(),{
+    method:'GET',
+    headers:{'X-API-Key':key,'Accept':'application/json'},
+    signal
+  });
+  if(r.status===401||r.status===403) throw new Error('AUTH_FAILED');
+  if(r.status>=500&&r.status<600){const e=new Error('HTTP_'+r.status);e.retryable=true;throw e;}
+  if(!r.ok) throw new Error('HTTP_'+r.status);
+  return await r.json();
+}
+const REFRESH_MS=30000;
+const BACKOFF_BASE=1000;
+const BACKOFF_MAX=30000;
+
+/* ========== components ========== */
+function Login({onLogin}){
+  const [val,setVal]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState('');
+
+  const submit=useCallback(async(e)=>{
+    e&&e.preventDefault();
+    const k=val.trim();
+    if(!k){ setErr('введите ключ'); return; }
+    setBusy(true); setErr('');
+    try{
+      await apiRecent({key:k,limit:1});
+      localStorage.setItem(KEY_STORAGE,k);
+      onLogin(k);
+    }catch(e){
+      if(e.message==='AUTH_FAILED') setErr('неверный ключ');
+      else if(e.name==='TypeError') setErr('сеть недоступна или CORS');
+      else setErr('ошибка: '+e.message);
+    }finally{ setBusy(false); }
+  },[val,onLogin]);
+
+  return (
+    <div className="container">
+      <div className="box" style={{maxWidth:480,margin:'80px auto'}}>
+        <div className="box-title">Авторизация</div>
+        <form onSubmit={submit}>
+          <div className="fld" style={{marginBottom:12}}>
+            <label>X-API-Key</label>
+            <input
+              type="password"
+              value={val}
+              onChange={e=>setVal(e.target.value)}
+              placeholder="DASHBOARD_API_KEY"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="row">
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy?'Проверка…':'Войти'}
+            </button>
+            {err && <span className="txt-muted" style={{color:'#ff8a80'}}>{err}</span>}
+          </div>
+        </form>
+        <div className="txt-dim" style={{marginTop:14,fontSize:10}}>
+          Ключ хранится в localStorage (key={KEY_STORAGE}). Не публиковать в общедоступных местах.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Filters({state,onChange,onRefresh,busy}){
+  const set=(k,v)=>onChange({...state,[k]:v});
+  return (
+    <div className="box">
+      <div className="box-title">Фильтры</div>
+      <div className="row">
+        <div className="fld">
+          <label>flag</label>
+          <select value={state.flag} onChange={e=>set('flag',e.target.value)}>
+            <option value="all">all</option>
+            <option value="bad">bad</option>
+            <option value="corrected">corrected</option>
+            <option value="retry">retry</option>
+            <option value="good">good</option>
+            <option value="null">(none)</option>
+          </select>
+        </div>
+        <div className="fld">
+          <label>source</label>
+          <select value={state.source} onChange={e=>set('source',e.target.value)}>
+            <option value="all">all</option>
+            <option value="index">index</option>
+            <option value="judge">judge</option>
+          </select>
+        </div>
+        <div className="fld grow">
+          <label>device_id</label>
+          <input
+            type="text"
+            value={state.device_id}
+            onChange={e=>set('device_id',e.target.value)}
+            placeholder="contains…"
+            spellCheck={false}
+          />
+        </div>
+        <div className="fld">
+          <label>limit</label>
+          <select value={state.limit} onChange={e=>set('limit',Number(e.target.value))}>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+        </div>
+        <div className="fld" style={{minWidth:100}}>
+          <label>&nbsp;</label>
+          <button className="btn btn-primary" onClick={onRefresh} disabled={busy}>
+            {busy?'…':'Обновить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LogsTable({rows,onPick,loading,err,usingMock}){
+  if(loading) return <div className="loading">Загрузка</div>;
+  if(err) return <div className="err">Ошибка: {err}</div>;
+  if(!rows||rows.length===0) return <div className="empty">Нет записей по выбранным фильтрам</div>;
+  return (
+    <div className="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>created_at</th>
+            <th>device</th>
+            <th>src</th>
+            <th>whisper_text</th>
+            <th style={{textAlign:'right'}}>map</th>
+            <th style={{textAlign:'right'}}>unm</th>
+            <th>flag</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r=>(
+            <tr key={r.id} className="row-clickable" onClick={()=>onPick(r)}>
+              <td className="mono-num txt-muted">{fmtDate(r.created_at)}</td>
+              <td><span className="txt-trunc" style={{maxWidth:120}}>{r.device_id||'—'}</span></td>
+              <td className="txt-muted">{r.source||'—'}</td>
+              <td><span className="txt-trunc txt-quote">{trunc(r.whisper_text,60)||<em className="txt-dim">пусто</em>}</span></td>
+              <td className="mono-num" style={{textAlign:'right'}}>{(r.mapped_elements||[]).length}</td>
+              <td className="mono-num" style={{textAlign:'right',color:(r.unmatched_phrases||[]).length?'#ffd54f':'#455a64'}}>{(r.unmatched_phrases||[]).length}</td>
+              <td><span className={'flag '+flagClass(r.user_flag)}>{flagLabel(r.user_flag)}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {usingMock && <div className="txt-dim" style={{padding:8,textAlign:'center',fontSize:10}}>⚠ mock data — backend endpoint ещё не подключён</div>}
+    </div>
+  );
+}
+
+function DetailModal({row,onClose}){
+  useEffect(()=>{
+    const onKey=e=>{ if(e.key==='Escape') onClose(); };
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[onClose]);
+  if(!row) return null;
+  return (
+    <div className="modal-bk" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-hd">
+          <h2>voice_log · {row.id}</h2>
+          <button className="modal-x" onClick={onClose} title="esc">×</button>
+        </div>
+        <div className="modal-bd">
+          <div className="kv">
+            <div className="k">created_at</div><div className="v mono-num">{fmtDate(row.created_at)}</div>
+            <div className="k">device_id</div><div className="v">{row.device_id||'—'}</div>
+            <div className="k">event_id</div><div className="v">{row.event_id||'—'}</div>
+            <div className="k">source</div><div className="v">{row.source||'—'}</div>
+            <div className="k">duration_ms</div><div className="v mono-num">{row.duration_ms!=null?row.duration_ms:'—'}</div>
+            <div className="k">app_version</div><div className="v">{row.app_version||'—'}</div>
+            <div className="k">user_flag</div><div className="v"><span className={'flag '+flagClass(row.user_flag)}>{flagLabel(row.user_flag)}</span></div>
+          </div>
+
+          <div className="sec-title">whisper_text</div>
+          <div className="json-block">{row.whisper_text||'(пусто)'}</div>
+
+          <div className="sec-title">whisper_segments</div>
+          <div className="json-block">{safeJSON(row.whisper_segments)}</div>
+
+          <div className="sec-title">ai_parsed (DeepSeek)</div>
+          <div className="json-block">{safeJSON(row.ai_parsed)}</div>
+
+          <div className="sec-title">mapped_elements ({(row.mapped_elements||[]).length})</div>
+          <div className="json-block">{safeJSON(row.mapped_elements)}</div>
+
+          <div className="sec-title">unmatched_phrases ({(row.unmatched_phrases||[]).length})</div>
+          <div className="json-block">{safeJSON(row.unmatched_phrases)}</div>
+
+          <div className="sec-title">user_corrections</div>
+          <div className="json-block">{safeJSON(row.user_corrections)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [key,setKey]=useState(()=>localStorage.getItem(KEY_STORAGE)||'');
+  const [filters,setFilters]=useState({flag:'all',source:'all',device_id:'',limit:50});
+  const [rows,setRows]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState('');
+  const [picked,setPicked]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [lastUpdate,setLastUpdate]=useState(null);
+  const [retryAt,setRetryAt]=useState(null);
+  const abortRef=useRef(null);
+  const retryTimerRef=useRef(null);
+  const refreshTimerRef=useRef(null);
+  const backoffRef=useRef(BACKOFF_BASE);
+
+  const showToast=useCallback((msg,kind)=>{
+    setToast({msg,kind});
+    setTimeout(()=>setToast(null),2500);
+  },[]);
+
+  const clearTimers=useCallback(()=>{
+    if(retryTimerRef.current){clearTimeout(retryTimerRef.current);retryTimerRef.current=null;}
+    if(refreshTimerRef.current){clearTimeout(refreshTimerRef.current);refreshTimerRef.current=null;}
+  },[]);
+
+  const scheduleRefresh=useCallback((fn)=>{
+    if(refreshTimerRef.current)clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current=setTimeout(fn,REFRESH_MS);
+  },[]);
+
+  const load=useCallback(async()=>{
+    if(!key) return;
+    if(abortRef.current) abortRef.current.abort();
+    if(retryTimerRef.current){clearTimeout(retryTimerRef.current);retryTimerRef.current=null;}
+    setRetryAt(null);
+    const ctrl=new AbortController();
+    abortRef.current=ctrl;
+    setLoading(true); setErr('');
+    try{
+      const data=await apiRecent({
+        key,
+        limit:filters.limit,
+        flag:filters.flag==='null'?'null':filters.flag,
+        source:filters.source,
+        device_id:filters.device_id.trim()||undefined,
+        signal:ctrl.signal
+      });
+      const items=Array.isArray(data)?data:(data.items||data.rows||[]);
+      setRows(items);
+      setLastUpdate(new Date());
+      backoffRef.current=BACKOFF_BASE;
+      scheduleRefresh(()=>load());
+    }catch(e){
+      if(e.name==='AbortError') return;
+      if(e.message==='AUTH_FAILED'){
+        clearTimers();
+        localStorage.removeItem(KEY_STORAGE);
+        setKey('');
+        showToast('Сессия истекла — войдите снова','err');
+        return;
+      }
+      if(e.retryable){
+        const delay=backoffRef.current;
+        backoffRef.current=Math.min(backoffRef.current*2,BACKOFF_MAX);
+        setErr('backend '+e.message+' — повтор через '+Math.round(delay/1000)+'с');
+        setRetryAt(Date.now()+delay);
+        retryTimerRef.current=setTimeout(()=>load(),delay);
+        return;
+      }
+      setErr(e.message||'unknown');
+      backoffRef.current=BACKOFF_BASE;
+      scheduleRefresh(()=>load());
+    }finally{
+      setLoading(false);
+    }
+  },[key,filters,showToast,scheduleRefresh,clearTimers]);
+
+  useEffect(()=>{ if(key) load(); return clearTimers; /* eslint-disable-next-line */ },[key]);
+  useEffect(()=>{ return ()=>{ if(abortRef.current)abortRef.current.abort(); clearTimers(); }; },[clearTimers]);
+
+  const logout=useCallback(()=>{
+    clearTimers();
+    if(abortRef.current)abortRef.current.abort();
+    localStorage.removeItem(KEY_STORAGE);
+    setKey('');
+    setRows([]);
+    setPicked(null);
+    setErr('');
+    setLastUpdate(null);
+    setRetryAt(null);
+  },[clearTimers]);
+
+  if(!key){
+    return <>
+      <div className="hdr"><h1><span className="dot">●</span> VOICE LOGS MONITOR</h1><div className="hdr-r">{APP_VERSION}</div></div>
+      <Login onLogin={setKey}/>
+    </>;
+  }
+
+  return (
+    <>
+      <div className="hdr">
+        <h1><span className="dot">●</span> VOICE LOGS MONITOR</h1>
+        <div className="hdr-r">
+          <span>{APP_VERSION}</span>
+          <span className="txt-dim">·</span>
+          <span>{rows.length} rows</span>
+          {lastUpdate && <><span className="txt-dim">·</span><span className="txt-muted" title="Последнее обновление">upd {String(lastUpdate.getHours()).padStart(2,'0')}:{String(lastUpdate.getMinutes()).padStart(2,'0')}:{String(lastUpdate.getSeconds()).padStart(2,'0')}</span></>}
+          {retryAt && <><span className="txt-dim">·</span><span style={{color:'#ff8a80'}}>retry…</span></>}
+          <button className="btn btn-danger" onClick={logout} style={{padding:'4px 10px',fontSize:11}}>logout</button>
+        </div>
+      </div>
+      <div className="container">
+        <Filters state={filters} onChange={setFilters} onRefresh={load} busy={loading}/>
+        <LogsTable rows={rows} onPick={setPicked} loading={loading} err={err} usingMock={false}/>
+      </div>
+      {picked && <DetailModal row={picked} onClose={()=>setPicked(null)}/>}
+      {toast && <div className={'toast '+(toast.kind==='err'?'toast-err':'')}>{toast.msg}</div>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
