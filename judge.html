@@ -46,8 +46,8 @@ const LEVELS=[
 {name:"FREESTYLE 9",num:9,otj:50,podt:20,br:40,pres:6,vyh:5,minEl:8,minM:111,minF:83.25},
 {name:"FREESTYLE 10",num:10,otj:50,podt:20,br:40,pres:6,vyh:5,minEl:4,minM:110,minF:82.5}];
 
-/* Only freestyle-eligible levels (have minEl > 0) for auto-detection */
-const FS_LEVELS=LEVELS.filter(l=>l.minEl>0);
+/* All levels for auto-detection (both base and freestyle) */
+const ALL_LEVELS=LEVELS;
 
 const SN=["Связка 1","Связка 2","Связка 3","Связка 4","Связка 5","Связка 6","Связка 7","Связка 8","Связка 9","Связка 10"];
 const SC=["#14b8a6","#f59e0b","#a78bfa","#f472b6","#38bdf8","#fb923c","#4ade80","#e879f9","#fbbf24","#67e8f9"];
@@ -55,17 +55,20 @@ const SC=["#14b8a6","#f59e0b","#a78bfa","#f472b6","#38bdf8","#fb923c","#4ade80",
 /* ── Fuzzy ── */
 function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>i);for(let j=1;j<=n;j++){let p=d[0];d[0]=j;for(let i=1;i<=m;i++){const t=d[i];d[i]=a[i-1]===b[j-1]?p:1+Math.min(p,d[i],d[i-1]);p=t;}}return d[m];}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е").replace(/[.\-_\/\\,;:!?()]/g," ").replace(/\s+/g," ").trim();}
-function normNum(s){return(" "+norm(s)+" ").replace(/(?<=\s)(одну|одной|одного|одним|одном|одна|одно|один)(?=\s)/g,"1").replace(/(?<=\s)(двух|двум|двумя|двое|две|два)(?=\s)/g,"2").replace(/(?<=\s)(трех|трем|тремя|трое|три)(?=\s)/g,"3").replace(/(?<=\s)(четырех|четырем|четыре)(?=\s)/g,"4").replace(/\s+/g," ").trim();}
+function normNum(s){return(" "+norm(s)+" ").replace(/(?<=\s)(одну|одной|одного|одним|одном|одна|одно|один)(?=\s)/g,"1").replace(/(?<=\s)(двух|двум|двумя|двое|две|два)(?=\s)/g,"2").replace(/(?<=\s)(трех|трёх|трем|трём|тремя|трое|три)(?=\s)/g,"3").replace(/(?<=\s)(четырех|четырём|четырем|четырьмя|четыре)(?=\s)/g,"4").replace(/(?<=\s)(пяти|пятью|пять)(?=\s)/g,"5").replace(/(?<=\s)(шести|шестью|шесть)(?=\s)/g,"6").replace(/(?<=\s)(семи|семью|семь)(?=\s)/g,"7").replace(/(?<=\s)(восьми|восемью|восемь)(?=\s)/g,"8").replace(/(?<=\s)(девяти|девятью|девять)(?=\s)/g,"9").replace(/(?<=\s)(десяти|десятью|десять)(?=\s)/g,"10").replace(/\s+/g," ").trim();}
+function stem(w){if(w.length<=3)return w;const endings=["ами","ями","ого","его","ому","ему","ыми","ими","ей","ий","ой","ый","ая","яя","ое","ее","ую","ю","ы","и","а","я","е","у","о","ь"];for(const e of endings){if(w.endsWith(e)&&w.length-e.length>=3)return w.slice(0,-e.length);}return w;}
+function normStem(s){return normNum(s).split(" ").map(stem).join(" ");}
 function buildIdx(els,syn){return els.map(el=>{const n=normNum(el.name),w=n.split(" "),sk=[];for(const[k,v]of Object.entries(syn))if(v===el.name)sk.push(normNum(k));return{el,n,w,sk};});}
-function findBest(q,idx,th=0.45){const qn=normNum(q);if(!qn)return null;let bs=0,be=null;for(const{el,n,w,sk}of idx){if(n===qn)return{el,s:1,ex:true};for(const s of sk)if(s===qn)return{el,s:1,ex:true};if(n.includes(qn)){const s=qn.length/n.length*0.95;if(s>bs){bs=s;be=el;}}if(qn.length>2&&n.startsWith(qn+" ")){const s=Math.max(0.55,qn.length/n.length*1.2);if(s>bs){bs=Math.min(s,0.75);be=el;}}for(const s of sk){if(s.includes(qn)||qn.includes(s)){const sc=Math.min(qn.length,s.length)/Math.max(qn.length,s.length)*0.9;if(sc>bs){bs=sc;be=el;}}const d=lev(qn,s),ml=Math.max(qn.length,s.length),sc=ml>0?(1-d/ml):0;if(sc>bs){bs=sc;be=el;}}const qw=qn.split(" ");let mw=0;for(const qi of qw)for(const wi of w){const d=lev(qi,wi),ml=Math.max(qi.length,wi.length);if(ml>0&&(1-d/ml)>0.7){mw++;break;}}if(qw.length>0){const ws=mw/Math.max(qw.length,w.length)*0.85;if(ws>bs){bs=ws;be=el;}}const d=lev(qn,n),ml=Math.max(qn.length,n.length),s=ml>0?(1-d/ml)*0.8:0;if(s>bs){bs=s;be=el;}}if(bs>=th&&be)return{el:be,s:bs,ex:false};return null;}
+function findBest(q,idx,th=0.45){const qn=normNum(q);if(!qn)return null;let bs=0,be=null;for(const{el,n,w,sk}of idx){if(n===qn)return{el,s:1,ex:true};for(const s of sk)if(s===qn)return{el,s:1,ex:true};if(n.includes(qn)){const s=qn.length/n.length*0.95;if(s>bs){bs=s;be=el;}}if(qn.length>2&&n.startsWith(qn+" ")){const s=Math.max(0.55,qn.length/n.length*1.2);if(s>bs){bs=Math.min(s,0.75);be=el;}}for(const s of sk){if(s.includes(qn)||qn.includes(s)){const sc=Math.min(qn.length,s.length)/Math.max(qn.length,s.length)*0.9;if(sc>bs){bs=sc;be=el;}}const d=lev(qn,s),ml=Math.max(qn.length,s.length),sc=ml>0?(1-d/ml):0;if(sc>bs){bs=sc;be=el;}}const qw=qn.split(" ");let mw=0;for(const qi of qw)for(const wi of w){const d=lev(qi,wi),ml=Math.max(qi.length,wi.length);if(ml>0&&(1-d/ml)>0.7){mw++;break;}}if(qw.length>0){const ws=mw/Math.max(qw.length,w.length)*0.85;if(ws>bs){bs=ws;be=el;}}const d=lev(qn,n),ml=Math.max(qn.length,n.length),s=ml>0?(1-d/ml)*0.8:0;if(s>bs){bs=s;be=el;}}/* Stem match pass */const qs=normStem(q);if(qs){for(const{el,n}of idx){const ns=n.split(" ").map(stem).join(" ");if(ns===qs){if(bs<0.92){bs=0.92;be=el;}}else if(ns.includes(qs)||qs.includes(ns)){const sc=Math.min(qs.length,ns.length)/Math.max(qs.length,ns.length)*0.85;if(sc>bs){bs=sc;be=el;}}}}if(bs>=th&&be)return{el:be,s:bs,ex:false};return null;}
 
 /* ── Balance ── */
 function bal(sC,dC,lv){const mx=Math.max(sC,dC),mn=Math.min(sC,dC);if(mx===0)return 0;const r=(mx+mn)/Math.sqrt(2*(mx*mx+mn*mn));return(1-Math.acos(Math.min(1,Math.max(-1,r)))/Math.acos(Math.SQRT2/2))*lv;}
 
 /* ── Storage helper ── */
+let _lsQuotaWarned=false;
 const LS={
   get(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}},
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){if(e&&(e.name==="QuotaExceededError"||e.code===22||e.code===1014)){if(!_lsQuotaWarned){_lsQuotaWarned=true;try{alert("Хранилище браузера переполнено. Очистите старые данные или экспортируйте результаты — новые изменения не сохраняются.");}catch{}}}return false}}
 };
 
 /* ── Gauge ── */
@@ -210,7 +213,7 @@ async function whisperTranscribe(audioBlob){
 (function(){const s=LS.get("wu-ai");if(!s||!s.url||!s.key)LS.set("wu-ai",{url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});})();
 
 /* ── Protocol integration ── */
-function getCompAthletes(){try{const v=localStorage.getItem("comp_athletes");return v?JSON.parse(v).filter(a=>a.dir==="freestyle"):[];}catch{return[];}}
+function getCompAthletes(){try{const v=localStorage.getItem("comp_athletes");return v?JSON.parse(v):[];}catch{return[];}}
 function sendToProtocol(athlete,data){
   const key="comp_freestyle_results";
   let results=[];try{results=JSON.parse(localStorage.getItem(key))||[];}catch{}
@@ -255,7 +258,33 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const[lastResult,setLastResult]=useState(null);
   const[showReview,setShowReview]=useState(false);
   const mediaRec=useRef(null);const chunks=useRef([]);
+  const canvasRef=useRef(null);const rafRef=useRef(null);const audioCtxRef=useRef(null);
   const sidx=useMemo(()=>buildIdx(ELS,synonyms),[synonyms]);
+
+  const startViz=(stream)=>{
+    try{
+      const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
+      const ctx=new Ctx();audioCtxRef.current=ctx;
+      const src=ctx.createMediaStreamSource(stream);
+      const an=ctx.createAnalyser();an.fftSize=256;
+      src.connect(an);
+      const data=new Uint8Array(an.frequencyBinCount);
+      const draw=()=>{
+        if(!canvasRef.current||!audioCtxRef.current){rafRef.current=null;return;}
+        const c=canvasRef.current,cx=c.getContext("2d"),w=c.width,h=c.height;
+        cx.clearRect(0,0,w,h);
+        an.getByteFrequencyData(data);
+        const bars=data.length,bw=w/bars;
+        for(let i=0;i<bars;i++){const bh=(data[i]/255)*h;cx.fillStyle="#a855f7";cx.fillRect(i*bw,h-bh,Math.max(1,bw-1),bh);}
+        rafRef.current=requestAnimationFrame(draw);
+      };
+      draw();
+    }catch(e){/* viz best-effort */}
+  };
+  const stopViz=()=>{
+    if(rafRef.current){cancelAnimationFrame(rafRef.current);rafRef.current=null;}
+    if(audioCtxRef.current){try{audioCtxRef.current.close();}catch(e){}audioCtxRef.current=null;}
+  };
 
   const requestMic=async()=>{
     try{
@@ -276,10 +305,12 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     if(micOk!==true){const ok=await requestMic();if(!ok)return;}
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      startViz(stream);
       const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
       chunks.current=[];
       mr.ondataavailable=e=>{if(e.data.size>0)chunks.current.push(e.data);};
       mr.onstop=async()=>{
+        stopViz();
         stream.getTracks().forEach(t=>t.stop());
         const blob=new Blob(chunks.current,{type:mr.mimeType});
         if(blob.size<100){setStatus("Запись слишком короткая");setOn(false);return;}
@@ -404,6 +435,9 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 
     {status&&<div style={{padding:"6px 20px",fontSize:11,color:status.startsWith("Ошибка")?"#ef4444":"#64748b",background:status.startsWith("Ошибка")?"rgba(239,68,68,0.05)":"transparent"}}>{status}</div>}
 
+    {/* Live waveform during recording */}
+    {on&&<div style={{padding:"4px 20px 8px"}}><canvas ref={canvasRef} width={300} height={60} style={{width:"100%",maxWidth:"100%",height:"60px",background:"#0f172a",borderRadius:"8px",border:"1px solid #1e293b"}}/></div>}
+
     {!tx&&!on&&!parsed&&(<div style={{padding:"16px 20px"}}><div style={{fontSize:12,color:"#64748b",lineHeight:1.6,marginBottom:12}}><div style={{fontWeight:600,color:"#94a3b8",marginBottom:6}}>Как пользоваться:</div>{voiceAvail?"Говорите или пишите":"Пишите"}: <span style={{color:"#14b8a6"}}>"связка один"</span> — топорик, бочка — <span style={{color:"#f59e0b"}}>"связка два"</span> — склёпка, замок...<div style={{marginTop:6,color:"#475569"}}>Разделяйте: запятые, "потом", "далее"</div></div>
       <textarea value={ti} onChange={e=>setTi(e.target.value)} placeholder='связка один топорик потом бочка, связка два замок потом солнышко' rows={3} style={{width:"100%",padding:"10px 14px",background:"#0f172a",border:"1px solid #334155",borderRadius:10,color:"#e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}/>
       {ti.trim()&&<div style={{display:"flex",gap:8,marginTop:10}}>
@@ -502,15 +536,15 @@ function App(){
   const allRaw=useMemo(()=>slots.flat(),[slots]);
   const all=useMemo(()=>{const seen=new Set();return allRaw.filter(e=>{if(seen.has(e.name))return false;seen.add(e.name);return true;});},[allRaw]);
 
-  /* Calculate scores for ALL freestyle levels */
+  /* Calculate scores for ALL levels (base + freestyle) */
   const levelResults=useMemo(()=>{
-    return FS_LEVELS.map(lv=>calcForLevel(lv,all,g,penaltyScore,penalties.dq,slots));
+    return ALL_LEVELS.map(lv=>calcForLevel(lv,all,g,penaltyScore,penalties.dq,slots));
   },[all,g,penaltyScore,penalties.dq,slots]);
 
   /* Auto-detect best level: highest PASSED, or highest score if none pass */
   const bestResult=useMemo(()=>{
     const passed=levelResults.filter(r=>r.passed);
-    if(passed.length>0)return passed[passed.length-1]; /* highest passed (FS_LEVELS is sorted by num) */
+    if(passed.length>0)return passed[passed.length-1]; /* highest passed (ALL_LEVELS is sorted by num) */
     /* None passed — pick level with highest total */
     let best=levelResults[0];
     for(const r of levelResults)if(r.tot>best.tot)best=r;
@@ -562,7 +596,7 @@ function App(){
     {all.length>0&&<div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>{[[r.sOk,`Баллы ${r.sOk?">=":"<"} ${r.minS}`,r.minS>0],[r.comboOk,`Связка 3+ эл.: ${r.comboOk?"Да":"Нет"}`,true],[r.eOk,`Эл. ${r.lv.num} разр.: ${r.ownLevelCount}/${r.lv.minEl}+`,r.lv.minEl>0]].filter(x=>x[2]).map(([ok,t],i)=>(<div key={i} style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:ok?"rgba(20,184,166,0.12)":"rgba(239,68,68,0.12)",color:ok?"#14b8a6":"#ef4444",border:`1px solid ${ok?"rgba(20,184,166,0.3)":"rgba(239,68,68,0.3)"}`}}>{ok?"✓":"✗"} {t}</div>))}</div>}
 
     {/* Multi-level summary table */}
-    {all.length>0&&<><button onClick={()=>setShowLevels(!showLevels)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Все уровни ({levelResults.filter(r=>r.passed).length} сдано из {FS_LEVELS.length})</span><span style={{transform:showLevels?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
+    {all.length>0&&<><button onClick={()=>setShowLevels(!showLevels)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Все уровни ({levelResults.filter(r=>r.passed).length} сдано из {ALL_LEVELS.length})</span><span style={{transform:showLevels?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
     {showLevels&&<div style={{marginBottom:16,overflowX:"auto"}}>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
         <thead><tr style={{borderBottom:"1px solid #334155"}}>
@@ -685,7 +719,7 @@ function App(){
         txt+="\nВсе уровни:\n";
         levelResults.forEach(lr=>{txt+=shortName(lr.lv.name)+": "+lr.tot.toFixed(1)+" — "+(lr.passed?"СДАН":"не сдан"+(lr.failReasons.length>0?" ("+lr.failReasons.join(", ")+")":""))+"\n";});
         if(navigator.share){navigator.share({title:"Протокол WU (Судья)",text:txt}).catch(()=>{});}
-        else{navigator.clipboard.writeText(txt).then(()=>{}).catch(()=>{const w=window.open();w.document.write("<pre>"+txt+"</pre>");});}
+        else{navigator.clipboard.writeText(txt).then(()=>{}).catch(()=>{const w=window.open();if(w){const p=w.document.createElement("pre");p.textContent=txt;w.document.body.appendChild(p);}});}
       }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",background:"rgba(20,184,166,0.1)",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer"}}>Протокол</button>
       {selAthlete&&<button onClick={()=>{
         const a=compAthletes.find(x=>x.id===selAthlete);if(!a)return;

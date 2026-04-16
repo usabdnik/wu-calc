@@ -215,7 +215,8 @@ const DEMO_BASE=[
 
 /* ========== HELPERS ========== */
 function loadLS(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def}catch{return def}}
-function saveLS(key,val){localStorage.setItem(key,JSON.stringify(val))}
+let _lsQuotaWarned=false;
+function saveLS(key,val){try{localStorage.setItem(key,JSON.stringify(val));return true}catch(e){if(e&&(e.name==="QuotaExceededError"||e.code===22||e.code===1014)){if(!_lsQuotaWarned){_lsQuotaWarned=true;try{alert("Хранилище браузера переполнено. Экспортируйте результаты в CSV и очистите старые данные — новые изменения не сохраняются локально.");}catch{}}}return false}}
 function saveLSTracked(key,val,syncMgr){
   saveLS(key,val);
   if(!syncMgr)return;
@@ -331,15 +332,45 @@ function AthletesTab({athletes,setAthletes,clearResults,syncManager}){
     if(!csv.trim())return;
     const lines=csv.trim().split("\n").filter(l=>l.trim());
     const newAthletes=[];
-    for(const line of lines){
-      const parts=line.split(";").map(s=>s.trim());
-      if(parts.length<7)continue;
-      const [id,group,name,sex,age,level,dir]=parts;
-      newAthletes.push({id,group,name,sex:sex.toLowerCase(),age:parseInt(age)||0,level,dir:dir.toLowerCase(),present:true});
-    }
-    if(newAthletes.length>0){
+    const warnings=[];
+    const validLevels=new Set(allLevelNames);
+    lines.forEach((line,idx)=>{
+      const rowNum=idx+1;
+      const rawParts=line.split(";").map(s=>s.trim());
+      if(rawParts.length<7){warnings.push(`Строка ${rowNum}: нужно минимум 7 полей через ";"`);return}
+      let parts;
+      if(rawParts.length>7){
+        const extra=rawParts.length-7;
+        const head=rawParts.slice(0,2);
+        const nameJoined=rawParts.slice(2,3+extra).join("; ");
+        const tail=rawParts.slice(3+extra);
+        parts=[...head,nameJoined,...tail];
+      }else{parts=rawParts}
+      const [id,group,name,sexRaw,ageRaw,level,dirRaw]=parts;
+      const sex=(sexRaw||"").toLowerCase();
+      const dir=(dirRaw||"").toLowerCase();
+      const age=parseInt(ageRaw);
+      const errs=[];
+      if(!name||!name.trim())errs.push("пустое ФИО");
+      if(sex!=="м"&&sex!=="ж")errs.push(`пол "${sexRaw}" (ожидается м/ж)`);
+      if(!Number.isFinite(age)||age<1||age>120)errs.push(`возраст "${ageRaw}" вне 1-120`);
+      if(!validLevels.has(level))errs.push(`уровень "${level}" неизвестен`);
+      if(dir!=="base"&&dir!=="freestyle")errs.push(`направление "${dirRaw}" (ожидается base/freestyle)`);
+      if(errs.length>0){warnings.push(`Строка ${rowNum} (${name||"?"}): ${errs.join(", ")}`);return}
+      newAthletes.push({id:id||String(Date.now())+"_"+rowNum,group,name:name.trim(),sex,age,level,dir,present:true});
+    });
+    const imported=newAthletes.length;
+    const skipped=warnings.length;
+    if(imported>0){
       setAthletes(prev=>[...prev,...newAthletes]);
       setCsv("");
+    }
+    if(skipped>0){
+      const head=`Импортировано: ${imported}\nПропущено: ${skipped}\n\n`;
+      const body=warnings.slice(0,15).join("\n")+(warnings.length>15?`\n…и ещё ${warnings.length-15}`:"");
+      alert(head+body);
+    }else if(imported>0){
+      alert(`Импортировано: ${imported}`);
     }
   }
 

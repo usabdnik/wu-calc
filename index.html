@@ -51,17 +51,20 @@ const SC=["#14b8a6","#f59e0b","#a78bfa","#f472b6","#38bdf8","#fb923c","#4ade80",
 /* ── Fuzzy ── */
 function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>i);for(let j=1;j<=n;j++){let p=d[0];d[0]=j;for(let i=1;i<=m;i++){const t=d[i];d[i]=a[i-1]===b[j-1]?p:1+Math.min(p,d[i],d[i-1]);p=t;}}return d[m];}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е").replace(/[.\-_\/\\,;:!?()]/g," ").replace(/\s+/g," ").trim();}
-function normNum(s){return(" "+norm(s)+" ").replace(/(?<=\s)(одну|одной|одного|одним|одном|одна|одно|один)(?=\s)/g,"1").replace(/(?<=\s)(двух|двум|двумя|двое|две|два)(?=\s)/g,"2").replace(/(?<=\s)(трех|трем|тремя|трое|три)(?=\s)/g,"3").replace(/(?<=\s)(четырех|четырем|четыре)(?=\s)/g,"4").replace(/\s+/g," ").trim();}
+function normNum(s){return(" "+norm(s)+" ").replace(/(?<=\s)(одну|одной|одного|одним|одном|одна|одно|один)(?=\s)/g,"1").replace(/(?<=\s)(двух|двум|двумя|двое|две|два)(?=\s)/g,"2").replace(/(?<=\s)(трех|трёх|трем|трём|тремя|трое|три)(?=\s)/g,"3").replace(/(?<=\s)(четырех|четырём|четырем|четырьмя|четыре)(?=\s)/g,"4").replace(/(?<=\s)(пяти|пятью|пять)(?=\s)/g,"5").replace(/(?<=\s)(шести|шестью|шесть)(?=\s)/g,"6").replace(/(?<=\s)(семи|семью|семь)(?=\s)/g,"7").replace(/(?<=\s)(восьми|восемью|восемь)(?=\s)/g,"8").replace(/(?<=\s)(девяти|девятью|девять)(?=\s)/g,"9").replace(/(?<=\s)(десяти|десятью|десять)(?=\s)/g,"10").replace(/\s+/g," ").trim();}
+function stem(w){if(w.length<=3)return w;const endings=["ами","ями","ого","его","ому","ему","ыми","ими","ей","ий","ой","ый","ая","яя","ое","ее","ую","ю","ы","и","а","я","е","у","о","ь"];for(const e of endings){if(w.endsWith(e)&&w.length-e.length>=3)return w.slice(0,-e.length);}return w;}
+function normStem(s){return normNum(s).split(" ").map(stem).join(" ");}
 function buildIdx(els,syn){return els.map(el=>{const n=normNum(el.name),w=n.split(" "),sk=[];for(const[k,v]of Object.entries(syn))if(v===el.name)sk.push(normNum(k));return{el,n,w,sk};});}
-function findBest(q,idx,th=0.45){const qn=normNum(q);if(!qn)return null;let bs=0,be=null;for(const{el,n,w,sk}of idx){if(n===qn)return{el,s:1,ex:true};for(const s of sk)if(s===qn)return{el,s:1,ex:true};if(n.includes(qn)){const s=qn.length/n.length*0.95;if(s>bs){bs=s;be=el;}}/* Bonus: query matches first word(s) of element — only full words, len>2 */if(qn.length>2&&n.startsWith(qn+" ")){const s=Math.max(0.55,qn.length/n.length*1.2);if(s>bs){bs=Math.min(s,0.75);be=el;}}for(const s of sk){if(s.includes(qn)||qn.includes(s)){const sc=Math.min(qn.length,s.length)/Math.max(qn.length,s.length)*0.9;if(sc>bs){bs=sc;be=el;}}const d=lev(qn,s),ml=Math.max(qn.length,s.length),sc=ml>0?(1-d/ml):0;if(sc>bs){bs=sc;be=el;}}const qw=qn.split(" ");let mw=0;for(const qi of qw)for(const wi of w){const d=lev(qi,wi),ml=Math.max(qi.length,wi.length);if(ml>0&&(1-d/ml)>0.7){mw++;break;}}if(qw.length>0){const ws=mw/Math.max(qw.length,w.length)*0.85;if(ws>bs){bs=ws;be=el;}}const d=lev(qn,n),ml=Math.max(qn.length,n.length),s=ml>0?(1-d/ml)*0.8:0;if(s>bs){bs=s;be=el;}}if(bs>=th&&be)return{el:be,s:bs,ex:false};return null;}
+function findBest(q,idx,th=0.45){const qn=normNum(q);if(!qn)return null;let bs=0,be=null;for(const{el,n,w,sk}of idx){if(n===qn)return{el,s:1,ex:true};for(const s of sk)if(s===qn)return{el,s:1,ex:true};if(n.includes(qn)){const s=qn.length/n.length*0.95;if(s>bs){bs=s;be=el;}}/* Bonus: query matches first word(s) of element — only full words, len>2 */if(qn.length>2&&n.startsWith(qn+" ")){const s=Math.max(0.55,qn.length/n.length*1.2);if(s>bs){bs=Math.min(s,0.75);be=el;}}for(const s of sk){if(s.includes(qn)||qn.includes(s)){const sc=Math.min(qn.length,s.length)/Math.max(qn.length,s.length)*0.9;if(sc>bs){bs=sc;be=el;}}const d=lev(qn,s),ml=Math.max(qn.length,s.length),sc=ml>0?(1-d/ml):0;if(sc>bs){bs=sc;be=el;}}const qw=qn.split(" ");let mw=0;for(const qi of qw)for(const wi of w){const d=lev(qi,wi),ml=Math.max(qi.length,wi.length);if(ml>0&&(1-d/ml)>0.7){mw++;break;}}if(qw.length>0){const ws=mw/Math.max(qw.length,w.length)*0.85;if(ws>bs){bs=ws;be=el;}}const d=lev(qn,n),ml=Math.max(qn.length,n.length),s=ml>0?(1-d/ml)*0.8:0;if(s>bs){bs=s;be=el;}}/* Stem match pass */const qs=normStem(q);if(qs){for(const{el,n}of idx){const ns=n.split(" ").map(stem).join(" ");if(ns===qs){if(bs<0.92){bs=0.92;be=el;}}else if(ns.includes(qs)||qs.includes(ns)){const sc=Math.min(qs.length,ns.length)/Math.max(qs.length,ns.length)*0.85;if(sc>bs){bs=sc;be=el;}}}}if(bs>=th&&be)return{el:be,s:bs,ex:false};return null;}
 
 /* ── Balance ── */
 function bal(sC,dC,lv){const mx=Math.max(sC,dC),mn=Math.min(sC,dC);if(mx===0)return 0;const r=(mx+mn)/Math.sqrt(2*(mx*mx+mn*mn));return(1-Math.acos(Math.min(1,Math.max(-1,r)))/Math.acos(Math.SQRT2/2))*lv;}
 
 /* ── Storage helper (localStorage for phone) ── */
+let _lsQuotaWarned=false;
 const LS={
   get(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}},
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){if(e&&(e.name==="QuotaExceededError"||e.code===22||e.code===1014)){if(!_lsQuotaWarned){_lsQuotaWarned=true;try{alert("Хранилище браузера переполнено. Очистите старые данные или экспортируйте результаты — новые изменения не сохраняются.");}catch{}}}return false}}
 };
 
 /* ── Gauge ── */
@@ -232,7 +235,33 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
   const[lastResult,setLastResult]=useState(null);/* {text, parsed, applied} — for review after apply */
   const[showReview,setShowReview]=useState(false);
   const mediaRec=useRef(null);const chunks=useRef([]);
+  const canvasRef=useRef(null);const rafRef=useRef(null);const audioCtxRef=useRef(null);
   const sidx=useMemo(()=>buildIdx(ELS,synonyms),[synonyms]);
+
+  const startViz=(stream)=>{
+    try{
+      const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
+      const ctx=new Ctx();audioCtxRef.current=ctx;
+      const src=ctx.createMediaStreamSource(stream);
+      const an=ctx.createAnalyser();an.fftSize=256;
+      src.connect(an);
+      const data=new Uint8Array(an.frequencyBinCount);
+      const draw=()=>{
+        if(!canvasRef.current||!audioCtxRef.current){rafRef.current=null;return;}
+        const c=canvasRef.current,cx=c.getContext("2d"),w=c.width,h=c.height;
+        cx.clearRect(0,0,w,h);
+        an.getByteFrequencyData(data);
+        const bars=data.length,bw=w/bars;
+        for(let i=0;i<bars;i++){const bh=(data[i]/255)*h;cx.fillStyle="#14b8a6";cx.fillRect(i*bw,h-bh,Math.max(1,bw-1),bh);}
+        rafRef.current=requestAnimationFrame(draw);
+      };
+      draw();
+    }catch(e){/* viz best-effort */}
+  };
+  const stopViz=()=>{
+    if(rafRef.current){cancelAnimationFrame(rafRef.current);rafRef.current=null;}
+    if(audioCtxRef.current){try{audioCtxRef.current.close();}catch(e){}audioCtxRef.current=null;}
+  };
 
   const requestMic=async()=>{
     try{
@@ -253,10 +282,12 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
     if(micOk!==true){const ok=await requestMic();if(!ok)return;}
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      startViz(stream);
       const mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
       chunks.current=[];
       mr.ondataavailable=e=>{if(e.data.size>0)chunks.current.push(e.data);};
       mr.onstop=async()=>{
+        stopViz();
         stream.getTracks().forEach(t=>t.stop());
         const blob=new Blob(chunks.current,{type:mr.mimeType});
         if(blob.size<100){setStatus("Запись слишком короткая");setOn(false);return;}
@@ -386,6 +417,9 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 
     {/* Status line */}
     {status&&<div style={{padding:"6px 20px",fontSize:11,color:status.startsWith("⛔")?"#ef4444":"#64748b",background:status.startsWith("⛔")?"rgba(239,68,68,0.05)":"transparent"}}>{status}</div>}
+
+    {/* Live waveform during recording */}
+    {on&&<div style={{padding:"4px 20px 8px"}}><canvas ref={canvasRef} width={300} height={60} style={{width:"100%",maxWidth:"100%",height:"60px",background:"#0f172a",borderRadius:"8px",border:"1px solid #1e293b"}}/></div>}
 
     {/* Instructions + text input (always shown when no result yet) */}
     {!tx&&!on&&!parsed&&(<div style={{padding:"16px 20px"}}><div style={{fontSize:12,color:"#64748b",lineHeight:1.6,marginBottom:12}}><div style={{fontWeight:600,color:"#94a3b8",marginBottom:6}}>Как пользоваться:</div>{voiceAvail?"Говорите или пишите":"Пишите"}: <span style={{color:"#14b8a6"}}>"связка один"</span> — топорик, бочка — <span style={{color:"#f59e0b"}}>"связка два"</span> — склёпка, замок...<div style={{marginTop:6,color:"#475569"}}>Разделяйте: запятые, "потом", "далее"</div><div style={{marginTop:3,color:"#475569"}}>Длинные названия — в кавычках: «выход на одну руку»</div></div>
@@ -705,7 +739,7 @@ function App(){
         txt+="Эл. "+lv.num+" разряда: "+ownLevelCount+"/"+lv.minEl+"\n";
         txt+="Результат: "+(penalties.dq?"ДИСКВАЛИФИКАЦИЯ":(allOk?"ВЫПОЛНЕН":"НЕ ВЫПОЛНЕН"))+"\n";
         if(navigator.share){navigator.share({title:"Протокол WU",text:txt}).catch(()=>{});}
-        else{navigator.clipboard.writeText(txt).then(()=>alert("Скопировано!")).catch(()=>{const w=window.open();w.document.write("<pre>"+txt+"</pre>");});}
+        else{navigator.clipboard.writeText(txt).then(()=>alert("Скопировано!")).catch(()=>{const w=window.open();if(w){const p=w.document.createElement("pre");p.textContent=txt;w.document.body.appendChild(p);}});}
       }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(20,184,166,0.3)",background:"rgba(20,184,166,0.1)",color:"#14b8a6",fontSize:13,fontWeight:600,cursor:"pointer"}}>📋 Протокол</button>
       {selAthlete&&<button onClick={()=>{
         const a=compAthletes.find(x=>x.id===selAthlete);if(!a)return;
