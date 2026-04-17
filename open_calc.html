@@ -292,7 +292,7 @@ function calcOpenScore(uniqueEls, penaltyScore, isDQ){
 }
 
 /* ── VoicePanel (same as index.html) ── */
-function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
+function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty,onPenaltyEvent}){
   const[on,setOn]=useState(false);const[tx,setTx]=useState("");const[itx,setItx]=useState("");
   const[parsed,setParsed]=useState(null);const[uri,setUri]=useState(null);const[sq,setSq]=useState("");
   const[ti,setTi]=useState("");const[status,setStatus]=useState("");
@@ -434,13 +434,24 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
 
   const apply=()=>{
     if(!parsed)return;const maxSl=Math.max(curSlots.length-1,...parsed.map(p=>p.sl));const ns=Array.from({length:maxSl+1},(_, i)=>i<curSlots.length?[...curSlots[i]]:[]);const ex=new Set(curSlots.flat().map(e=>e.name));
-    parsed.forEach(({sl,ms})=>ms.forEach(({el})=>{if(el&&!ex.has(el.name)){ns[sl].push(el);ex.add(el.name);}}));
+    const pendingPen=[];let pendingDQ=false;
+    parsed.forEach(({sl,ms})=>ms.forEach(({el,penalty})=>{
+      if(el&&!ex.has(el.name)){
+        const elementIdx=ns[sl].length;
+        ns[sl].push(el);ex.add(el.name);
+        if(penalty==="dirty"||penalty==="fall")pendingPen.push({type:penalty,slotIdx:sl,elementIdx,elementName:el.name});
+        else if(penalty==="dq")pendingDQ=true;
+      }
+    }));
     const srcText=tx||ti;
     const matched=[];const missed=[];
     parsed.forEach(({sl,ms})=>ms.forEach(({q,el})=>{if(el)matched.push({q,name:el.name,sl});else missed.push({q,sl});}));
     setLastResult({text:srcText,matched,missed,slots:parsed.map(p=>p.sl)});
     setShowReview(missed.length>0);
-    onApply(ns);setParsed(null);setTx("");setTi("");
+    onApply(ns);
+    if(pendingDQ&&onPenalty)onPenalty("dq");
+    if(onPenaltyEvent)pendingPen.forEach(p=>onPenaltyEvent(p.type,p.slotIdx,p.elementIdx,p.elementName));
+    setParsed(null);setTx("");setTi("");
     /* mark apply timestamp for retry detection */
     lastApplyAt.current=Date.now();
   };
@@ -458,7 +469,7 @@ function VoicePanel({onApply,synonyms,onAddSyn,slots:curSlots,onPenalty}){
       if(data.elements&&data.elements.length){
         lastAiParsed.current=data;
         const voiceChunks=parseVoice(src);
-        const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence};});
+        const aiEls=data.elements.map(ai=>{const el=ELS.find(e=>e.name===ai.name);return{q:ai.spoken||ai.name,m:el?{el,s:1,ex:true}:null,el:el||null,confidence:ai.confidence,penalty:ai.penalty||null};});
         if(voiceChunks.length>1||voiceChunks[0].sl!==0||voiceChunks.length===1&&voiceChunks[0].raw!==src.trim()){
           const loSrc=norm(src);const slotRanges=[];
           for(let i=0;i<voiceChunks.length;i++){
@@ -764,7 +775,7 @@ function App(){
     {/* Voice input */}
     <button onClick={()=>setShowV(!showV)} style={{width:"100%",padding:"14px",borderRadius:12,border:`1px solid ${showV?"rgba(20,184,166,0.3)":"#334155"}`,cursor:"pointer",fontSize:14,fontWeight:600,marginBottom:16,background:showV?"linear-gradient(135deg,rgba(20,184,166,0.2),rgba(20,184,166,0.05))":"linear-gradient(135deg,#1e293b,#0f172a)",color:showV?"#14b8a6":"#94a3b8",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{fontSize:18}}>🎙️</span>{showV?"Скрыть голосовой ввод":"Голосовой ввод связок"}</button>
 
-    {showV&&<VoicePanel onApply={(s)=>{setSlots(s);setShowV(false);}} synonyms={syn} onAddSyn={addSyn} slots={slots} onPenalty={addPenalty}/>}
+    {showV&&<VoicePanel onApply={(s)=>{setSlots(s);setShowV(false);}} synonyms={syn} onAddSyn={addSyn} slots={slots} onPenalty={addPenalty} onPenaltyEvent={addPenaltyEvent}/>}
 
     <div style={{fontSize:12,color:"#64748b",marginBottom:12,fontWeight:500}}>Связки ({slots.length})</div>
     {slots.map((slot,i)=>(<div key={i} style={{position:"relative"}}>{slots.length>1&&<button onClick={()=>removeSlot(i)} style={{position:"absolute",top:0,right:0,width:24,height:24,borderRadius:6,border:"1px solid #334155",background:"#1e293b",color:"#64748b",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}} title="Удалить связку">×</button>}<Pick label={SN[i]||("Связка "+(i+1))} color={SC[i%SC.length]} elements={ELS} selected={slot} onAdd={el=>add(i,el)} onRemove={nm=>rem(i,nm)} onMove={(from,to)=>move(i,from,to)} synonyms={syn}/></div>))}
