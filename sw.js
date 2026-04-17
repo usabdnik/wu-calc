@@ -1,4 +1,4 @@
-const CACHE = 'wu-calc-v7';
+const CACHE = 'wu-calc-v8';
 const URLS = [
   './',
   './index.html',

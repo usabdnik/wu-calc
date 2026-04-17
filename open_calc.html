@@ -259,19 +259,36 @@ function sendToOpenProtocol(athlete,data){
   localStorage.setItem(key,JSON.stringify(results));
 }
 
-/* ── Открытые соревнования: простой подсчёт суммы баллов ── */
-/* Без фильтра диапазона уровней, без авто-определения. Все уникальные элементы засчитываются.
-   ДСК → tot=0 (спортсмен не в призах). Баланс считается по всем элементам. */
+/* ── Открытые соревнования: авто-подбор разряда по max(tot) ── */
+/* Freestyle-уровни (1..10), без Biginner/Diligent (это base). */
+const OPEN_LEVELS=LEVELS.filter(l=>!/Biginner|Diligent/.test(l.name));
+
+/* Для каждого разряда N считаем сумму элементов из диапазона [N-1, N+2.5].
+   Берём разряд с максимальной итоговой суммой (raw+balance-penalty).
+   ДСК → tot=0. */
 function calcOpenScore(uniqueEls, penaltyScore, isDQ){
-  const credited=isDQ?[]:uniqueEls;
-  const sC=credited.filter(e=>e.cat==="Статика").length;
-  const dC=credited.filter(e=>e.cat==="Динамика").length;
-  const raw=credited.reduce((s,e)=>s+e.score,0);
-  /* Бонус за баланс: используем среднюю формулу bal() с условным "уровнем" по средним баллам */
-  const avgScore=credited.length>0?raw/credited.length:3;
-  const b=isDQ?0:bal(sC,dC,Math.round(avgScore));
-  const tot=isDQ?0:(raw+b-penaltyScore);
-  return{credited,sC,dC,raw,b,tot,penaltyScore};
+  if(isDQ){
+    return{credited:[],sC:0,dC:0,raw:0,b:0,tot:0,penaltyScore,level:null,levelRange:null,tries:[]};
+  }
+  const tries=OPEN_LEVELS.map(lvObj=>{
+    const lv=lvObj.num;
+    const credited=uniqueEls.filter(e=>e.score>=lv-1&&e.score<=lv+2.5);
+    const sC=credited.filter(e=>e.cat==="Статика").length;
+    const dC=credited.filter(e=>e.cat==="Динамика").length;
+    const raw=credited.reduce((s,e)=>s+e.score,0);
+    const b=bal(sC,dC,lv);
+    const tot=raw+b-penaltyScore;
+    return{level:lvObj,credited,sC,dC,raw,b,tot};
+  });
+  /* max(tot); при равенстве — выше номер разряда */
+  let best=tries[0];
+  for(const t of tries){if(t.tot>best.tot||(t.tot===best.tot&&t.level.num>best.level.num))best=t;}
+  return{
+    credited:best.credited,sC:best.sC,dC:best.dC,raw:best.raw,b:best.b,tot:best.tot,
+    penaltyScore,level:best.level,
+    levelRange:[best.level.num-1,best.level.num+2.5],
+    tries
+  };
 }
 
 /* ── VoicePanel (same as index.html) ── */
@@ -679,7 +696,7 @@ function App(){
 
     {/* Main score display — простая сумма */}
     <div style={{background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:20,padding:24,marginBottom:20,border:`1px solid ${isDQ?"rgba(239,68,68,0.3)":"rgba(245,158,11,0.3)"}`,position:"relative",overflow:"hidden"}}>
-      {all.length>0&&<div style={{textAlign:"center",marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:isDQ?"#ef4444":"#f59e0b",letterSpacing:"0.05em"}}>{isDQ?"ДИСКВАЛИФИКАЦИЯ":"ИТОГО БАЛЛОВ"}</div></div>}
+      {all.length>0&&<div style={{textAlign:"center",marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:isDQ?"#ef4444":"#f59e0b",letterSpacing:"0.05em"}}>{isDQ?"ДИСКВАЛИФИКАЦИЯ":"ИТОГО БАЛЛОВ"}</div>{!isDQ&&r.level&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Разряд: <b style={{color:"#f59e0b"}}>{r.level.name}</b> · диапазон [{r.levelRange[0]}; {r.levelRange[1]}]</div>}</div>}
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}><Gauge value={r.tot} max={Math.max(r.tot*1.2,10)} color={isDQ?"#ef4444":"#f59e0b"}/><div style={{position:"absolute",textAlign:"center",transform:"translateY(-8px)"}}><div style={{fontSize:36,fontWeight:800,color:isDQ?"#ef4444":"#f59e0b",lineHeight:1}}>{r.tot.toFixed(1)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>баллов</div></div></div>
       <div style={{display:"grid",gridTemplateColumns:(r.penaltyScore>0||isDQ)?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:12,marginTop:16}}>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{r.raw.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Элементы</div></div>
@@ -693,7 +710,27 @@ function App(){
     {/* Breakdown panel (без уровней) */}
     {all.length>0&&<><button onClick={()=>setShowBreak(!showBreak)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Расшифровка баллов</span><span style={{transform:showBreak?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
     {showBreak&&<div style={{padding:16,background:"#0f172a",border:"1px solid #334155",borderRadius:12,marginBottom:12,fontSize:12}}>
-      <div style={{color:"#64748b",marginBottom:12}}>Все уникальные элементы засчитываются ({r.credited.length} шт.)</div>
+      {!isDQ&&r.level&&<div style={{color:"#94a3b8",marginBottom:12}}>Выбран разряд <b style={{color:"#f59e0b"}}>{r.level.name}</b> (макс. сумма). Засчитано {r.credited.length} из {all.length} по диапазону [{r.levelRange[0]}; {r.levelRange[1]}].</div>}
+      {isDQ&&<div style={{color:"#64748b",marginBottom:12}}>ДСК — 0 баллов</div>}
+      {!isDQ&&r.tries&&r.tries.length>0&&<div style={{marginBottom:12}}>
+        <div style={{color:"#64748b",fontSize:11,marginBottom:4}}>Сумма по каждому разряду:</div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+          <thead><tr style={{borderBottom:"1px solid #334155"}}>
+            <th style={{textAlign:"left",padding:"3px 6px",color:"#64748b",fontWeight:500}}>Разряд</th>
+            <th style={{textAlign:"center",padding:"3px 6px",color:"#64748b",fontWeight:500}}>Диапазон</th>
+            <th style={{textAlign:"center",padding:"3px 6px",color:"#64748b",fontWeight:500}}>Эл.</th>
+            <th style={{textAlign:"right",padding:"3px 6px",color:"#64748b",fontWeight:500}}>Итого</th>
+          </tr></thead>
+          <tbody>
+            {r.tries.map(t=>{const sel=t.level.num===r.level.num;return(<tr key={t.level.name} style={{borderBottom:"1px solid #1e293b",background:sel?"rgba(245,158,11,0.08)":"transparent"}}>
+              <td style={{padding:"3px 6px",color:sel?"#f59e0b":"#94a3b8",fontWeight:sel?700:400}}>{t.level.name}</td>
+              <td style={{textAlign:"center",padding:"3px 6px",color:"#64748b"}}>[{t.level.num-1}; {t.level.num+2.5}]</td>
+              <td style={{textAlign:"center",padding:"3px 6px",color:"#94a3b8"}}>{t.credited.length}</td>
+              <td style={{textAlign:"right",padding:"3px 6px",color:sel?"#f59e0b":"#e2e8f0",fontWeight:sel?700:500}}>{t.tot.toFixed(1)}</td>
+            </tr>);})}
+          </tbody>
+        </table>
+      </div>}
       <table style={{width:"100%",borderCollapse:"collapse"}}>
         <thead><tr style={{borderBottom:"1px solid #334155"}}>
           <th style={{textAlign:"left",padding:"4px 6px",color:"#64748b",fontWeight:500}}>Элемент</th>
@@ -779,6 +816,7 @@ function App(){
         txt+="═══════════════════════════\n";
         slots.forEach((s,i)=>{if(!s.length)return;txt+="\n"+(SN[i]||("Связка "+(i+1)))+":\n";s.forEach(el=>{txt+="  "+el.name+" ("+el.cat+", "+el.score+" б.)\n";});});
         txt+="\n═══════════════════════════\n";
+        if(!isDQ&&r.level)txt+="Разряд: "+r.level.name+" (диапазон ["+r.levelRange[0]+"; "+r.levelRange[1]+"])\n";
         txt+="Элементы: "+r.raw.toFixed(1)+" | Баланс: +"+r.b.toFixed(1)+" | ИТОГО: "+r.tot.toFixed(1)+"\n";
         txt+="Статика: "+r.sC+" | Динамика: "+r.dC+"\n";
         if(penalties.events.length>0){
@@ -805,8 +843,8 @@ function App(){
           dsk:isDQ,
           creditedNames,
           excludedNames:[],
-          level:null,
-          levelRange:null,
+          level:r.level?r.level.name:null,
+          levelRange:r.levelRange,
           raw:Math.round(r.raw*100)/100,
           balance:Math.round(r.b*100)/100,
           total:Math.round(r.tot*100)/100,
