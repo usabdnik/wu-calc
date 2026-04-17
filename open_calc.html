@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#a855f7">
+<meta name="theme-color" content="#f59e0b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="WU Judge">
+<meta name="apple-mobile-web-app-title" content="WU Open">
 <link rel="manifest" href="manifest.json">
-<title>WU Судейский Калькулятор</title>
+<title>WU Калькулятор (Открытые)</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#020617;font-family:system-ui,-apple-system,sans-serif;color:#e2e8f0;overflow-x:hidden}
@@ -247,31 +247,31 @@ async function postVoiceFlag(id,user_flag,user_corrections){
 /* ── AI defaults init ── */
 (function(){const s=LS.get("wu-ai");if(!s||!s.url||!s.key)LS.set("wu-ai",{url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});})();
 
-/* ── Protocol integration ── */
-function getCompAthletes(){try{const v=localStorage.getItem("comp_athletes");return v?JSON.parse(v):[];}catch{return[];}}
-function sendToProtocol(athlete,data){
-  const key="comp_freestyle_results";
+/* ── Protocol integration (открытые соревнования) ── */
+function getOpenAthletes(){try{const v=localStorage.getItem("open_athletes");return v?JSON.parse(v):[];}catch{return[];}}
+function sendToOpenProtocol(athlete,data){
+  const key="open_freestyle_results";
   let results=[];try{results=JSON.parse(localStorage.getItem(key))||[];}catch{}
   const idx=results.findIndex(r=>r.id===athlete.id);
   const entry={athleteIdx:0,id:athlete.id,group:athlete.group,name:athlete.name,sex:athlete.sex,age:athlete.age,level:athlete.level,...data};
-  try{const all=JSON.parse(localStorage.getItem("comp_athletes"))||[];const ai=all.findIndex(a=>a.id===athlete.id);if(ai>=0)entry.athleteIdx=ai;}catch{}
+  try{const all=JSON.parse(localStorage.getItem("open_athletes"))||[];const ai=all.findIndex(a=>a.id===athlete.id);if(ai>=0)entry.athleteIdx=ai;}catch{}
   if(idx>=0)results[idx]=entry;else results.push(entry);
   localStorage.setItem(key,JSON.stringify(results));
 }
 
-/* ── Auto-level scoring engine ── */
-/* Открытая сдача на разряд: разряд выбирается по max(tot) без проверки условий.
-   ДСК → tot=0 для всех уровней (спортсмен не попадает в призы). */
-function calcForLevel(lv, uniqueEls, g, penaltyScore, isDQ, slots){
-  const scoreLo=lv.num-1;
-  const scoreHi=lv.num+2.5;
-  const credited=isDQ?[]:uniqueEls.filter(e=>e.score>=scoreLo&&e.score<=scoreHi);
+/* ── Открытые соревнования: простой подсчёт суммы баллов ── */
+/* Без фильтра диапазона уровней, без авто-определения. Все уникальные элементы засчитываются.
+   ДСК → tot=0 (спортсмен не в призах). Баланс считается по всем элементам. */
+function calcOpenScore(uniqueEls, penaltyScore, isDQ){
+  const credited=isDQ?[]:uniqueEls;
   const sC=credited.filter(e=>e.cat==="Статика").length;
   const dC=credited.filter(e=>e.cat==="Динамика").length;
   const raw=credited.reduce((s,e)=>s+e.score,0);
-  const b=isDQ?0:bal(sC,dC,lv.num);
+  /* Бонус за баланс: используем среднюю формулу bal() с условным "уровнем" по средним баллам */
+  const avgScore=credited.length>0?raw/credited.length:3;
+  const b=isDQ?0:bal(sC,dC,Math.round(avgScore));
   const tot=isDQ?0:(raw+b-penaltyScore);
-  return{lv,credited,sC,dC,raw,b,tot,penaltyScore};
+  return{credited,sC,dC,raw,b,tot,penaltyScore};
 }
 
 /* ── VoicePanel (same as index.html) ── */
@@ -615,13 +615,13 @@ function PenaltyPickerModal({type,slots,slotNames,onApply,onApplyUnlinked,onClos
 function App(){
   const[g,setG]=useState("M");const[slots,setSlots]=useState([[]]);
   const[showV,setShowV]=useState(false);const[showAI,setShowAI]=useState(false);const[showBreak,setShowBreak]=useState(false);
-  const[showLevels,setShowLevels]=useState(false);
   /* penalties.events: [{id, type:"dirty"|"fall", slotIdx:int|null, elementIdx:int|null, elementName:string|null, note:string|null, createdAt}] */
   const[penalties,setPenalties]=useState({events:[],dq:false});
   const[penaltyPicker,setPenaltyPicker]=useState(null); /* null | {type:"dirty"|"fall"} */
   const[selAthlete,setSelAthlete]=useState("");
   const[protocolSent,setProtocolSent]=useState("");
-  const compAthletes=useMemo(()=>getCompAthletes(),[]);
+  /* Только участники с галочкой "Фристайл" */
+  const compAthletes=useMemo(()=>getOpenAthletes().filter(a=>a.freestyle!==false),[]);
   /* Голосовой addPenalty — без привязки к элементу (slotIdx=null). Ручная привязка делается через penaltyPicker UI. */
   const addPenalty=useCallback((type)=>{
     if(type==="dq"){setPenalties(p=>({...p,dq:true}));return;}
@@ -648,18 +648,8 @@ function App(){
   const allRaw=useMemo(()=>slots.flat(),[slots]);
   const all=useMemo(()=>{const seen=new Set();return allRaw.filter(e=>{if(seen.has(e.name))return false;seen.add(e.name);return true;});},[allRaw]);
 
-  /* Calculate scores for ALL levels (base + freestyle) */
-  const levelResults=useMemo(()=>{
-    return ALL_LEVELS.map(lv=>calcForLevel(lv,all,g,penaltyScore,penalties.dq,slots));
-  },[all,g,penaltyScore,penalties.dq,slots]);
-
-  /* Auto-detect best level: always argmax(tot).
-     При равенстве tot выбираем более высокий уровень (последний в ALL_LEVELS). */
-  const bestResult=useMemo(()=>{
-    let best=levelResults[0];
-    for(const r of levelResults)if(r.tot>=best.tot)best=r;
-    return best;
-  },[levelResults]);
+  /* Простой подсчёт для открытых соревнований (без уровней) */
+  const bestResult=useMemo(()=>calcOpenScore(all,penaltyScore,penalties.dq),[all,penaltyScore,penalties.dq]);
   const isDQ=penalties.dq;
 
   const add=(i,el)=>setSlots(p=>{const n=[...p];n[i]=[...n[i],el];return n;});
@@ -669,91 +659,58 @@ function App(){
   const removeSlot=(i)=>setSlots(p=>{if(p.length<=1)return p;const n=[...p];n.splice(i,1);return n;});
 
   const r=bestResult;
-  const shortName=(n)=>n.replace("SPIRIT ","S").replace("FREESTYLE ","F");
 
   return(<div style={{minHeight:"100vh",background:"linear-gradient(180deg,#020617 0%,#0f172a 40%)",color:"#e2e8f0",fontFamily:"system-ui,sans-serif"}}><div style={{maxWidth:480,margin:"0 auto",padding:"0 16px 40px"}}>
-    <div style={{padding:"24px 0 20px",textAlign:"center",position:"relative"}}><div style={{fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#a855f7",fontWeight:600,marginBottom:4}}>Workout Unlimited</div><h1 style={{fontSize:24,fontWeight:700,margin:0,color:"#e2e8f0"}}>Судейский калькулятор</h1><p style={{fontSize:12,color:"#475569",margin:"4px 0 0"}}>Авто-определение уровня — {ELS.length} элементов</p>
-      <button onClick={()=>setShowAI(!showAI)} style={{position:"absolute",top:24,right:0,width:36,height:36,borderRadius:10,border:"1px solid #334155",background:showAI?"rgba(168,85,247,0.15)":"#1e293b",color:showAI?"#a855f7":"#64748b",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>⚙️</button>
+    <div style={{padding:"24px 0 20px",textAlign:"center",position:"relative"}}><div style={{fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#f59e0b",fontWeight:600,marginBottom:4}}>Workout Unlimited · Открытые</div><h1 style={{fontSize:24,fontWeight:700,margin:0,color:"#e2e8f0"}}>Калькулятор фристайла</h1><p style={{fontSize:12,color:"#475569",margin:"4px 0 0"}}>Сумма всех баллов — {ELS.length} элементов</p>
+      <button onClick={()=>setShowAI(!showAI)} style={{position:"absolute",top:24,right:0,width:36,height:36,borderRadius:10,border:"1px solid #334155",background:showAI?"rgba(245,158,11,0.15)":"#1e293b",color:showAI?"#f59e0b":"#64748b",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>⚙️</button>
     </div>
     {showAI&&<AISettings/>}
 
     {compAthletes.length>0&&<div style={{marginBottom:16,padding:12,background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}>
-      <div style={{fontSize:11,color:"#a855f7",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Спортсмен (соревнования)</div>
+      <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Участник (открытые соревнования)</div>
       <select value={selAthlete} onChange={e=>{const v=e.target.value;setSelAthlete(v);if(v){const a=compAthletes.find(x=>x.id===v);if(a)setG(a.sex==="ж"?"F":"M");}}} style={{width:"100%",padding:"10px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:10,color:"#e2e8f0",fontSize:14,cursor:"pointer"}}>
         <option value="">— Без привязки —</option>
-        {compAthletes.map(a=><option key={a.id} value={a.id}>{a.name} — {a.level} ({a.sex==="ж"?"Ж":"М"})</option>)}
+        {compAthletes.map(a=><option key={a.id} value={a.id}>{a.name} ({a.sex==="ж"?"Ж":"М"}, {a.age} лет)</option>)}
       </select>
       {protocolSent&&<div style={{fontSize:12,color:"#22c55e",marginTop:6,textAlign:"center"}}>{protocolSent}</div>}
     </div>}
 
     <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:16}}>{["M","F"].map(x=>(<button key={x} onClick={()=>setG(x)} style={{padding:"8px 28px",borderRadius:10,border:"none",cursor:"pointer",fontSize:14,fontWeight:600,background:g===x?(x==="M"?"#14b8a6":"#f472b6"):"#1e293b",color:g===x?"#020617":"#64748b",transition:"all 0.2s"}}>{x==="M"?"Мужчины":"Женщины"}</button>))}</div>
 
-    {/* Main score display — auto-detected level (argmax tot) */}
-    <div style={{background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:20,padding:24,marginBottom:20,border:`1px solid ${isDQ?"rgba(239,68,68,0.3)":"rgba(168,85,247,0.3)"}`,position:"relative",overflow:"hidden"}}>
-      {all.length>0&&<div style={{textAlign:"center",marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:isDQ?"#ef4444":"#a855f7",letterSpacing:"0.05em"}}>{isDQ?"ДИСКВАЛИФИКАЦИЯ":"РАЗРЯД: "+r.lv.name}</div></div>}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}><Gauge value={r.tot} max={Math.max(r.tot*1.2,10)} color={isDQ?"#ef4444":"#a855f7"}/><div style={{position:"absolute",textAlign:"center",transform:"translateY(-8px)"}}><div style={{fontSize:36,fontWeight:800,color:isDQ?"#ef4444":"#a855f7",lineHeight:1}}>{r.tot.toFixed(1)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>баллов</div></div></div>
+    {/* Main score display — простая сумма */}
+    <div style={{background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:20,padding:24,marginBottom:20,border:`1px solid ${isDQ?"rgba(239,68,68,0.3)":"rgba(245,158,11,0.3)"}`,position:"relative",overflow:"hidden"}}>
+      {all.length>0&&<div style={{textAlign:"center",marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:isDQ?"#ef4444":"#f59e0b",letterSpacing:"0.05em"}}>{isDQ?"ДИСКВАЛИФИКАЦИЯ":"ИТОГО БАЛЛОВ"}</div></div>}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}><Gauge value={r.tot} max={Math.max(r.tot*1.2,10)} color={isDQ?"#ef4444":"#f59e0b"}/><div style={{position:"absolute",textAlign:"center",transform:"translateY(-8px)"}}><div style={{fontSize:36,fontWeight:800,color:isDQ?"#ef4444":"#f59e0b",lineHeight:1}}>{r.tot.toFixed(1)}</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>баллов</div></div></div>
       <div style={{display:"grid",gridTemplateColumns:(r.penaltyScore>0||isDQ)?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:12,marginTop:16}}>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{r.raw.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Элементы</div></div>
         <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:r.b>0?"#14b8a6":"#64748b"}}>+{r.b.toFixed(1)}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Баланс</div></div>
-        <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{r.credited.length<all.length?r.credited.length+"/"+all.length:all.length}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>{r.credited.length<all.length?"Засчит.":"Кол-во"}</div></div>
+        <div style={{textAlign:"center",padding:"10px 0",background:"rgba(15,23,42,0.6)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#e2e8f0"}}>{all.length}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Кол-во</div></div>
         {(r.penaltyScore>0||isDQ)&&<div style={{textAlign:"center",padding:"10px 0",background:"rgba(239,68,68,0.1)",borderRadius:12}}><div style={{fontSize:20,fontWeight:700,color:"#ef4444"}}>{isDQ?"ДСК":"-"+r.penaltyScore}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>Штрафы</div></div>}
       </div>
       <div style={{marginTop:16}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}><span style={{color:"#14b8a6"}}>Статика: {r.sC}</span><span style={{color:"#64748b"}}>Баланс</span><span style={{color:"#f59e0b"}}>Динамика: {r.dC}</span></div><div style={{height:6,background:"#0f172a",borderRadius:3,display:"flex",overflow:"hidden"}}>{(r.sC+r.dC)>0&&<><div style={{width:`${r.sC/(r.sC+r.dC)*100}%`,background:"#14b8a6",borderRadius:3,transition:"width 0.5s"}}/><div style={{width:`${r.dC/(r.sC+r.dC)*100}%`,background:"#f59e0b",borderRadius:3,transition:"width 0.5s"}}/></>}</div></div>
     </div>
 
-    {/* Multi-level summary table (без колонки ✅/❌ — выбор по max tot) */}
-    {all.length>0&&<><button onClick={()=>setShowLevels(!showLevels)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Все уровни (выбран: {shortName(r.lv.name)})</span><span style={{transform:showLevels?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
-    {showLevels&&<div style={{marginBottom:16,overflowX:"auto"}}>
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-        <thead><tr style={{borderBottom:"1px solid #334155"}}>
-          <th style={{textAlign:"left",padding:"6px 8px",color:"#64748b",fontWeight:500}}>Уровень</th>
-          <th style={{textAlign:"center",padding:"6px 4px",color:"#64748b",fontWeight:500}}>Балл</th>
-          <th style={{textAlign:"center",padding:"6px 4px",color:"#64748b",fontWeight:500}}>Стат</th>
-          <th style={{textAlign:"center",padding:"6px 4px",color:"#64748b",fontWeight:500}}>Дин</th>
-          <th style={{textAlign:"center",padding:"6px 4px",color:"#64748b",fontWeight:500}}>Засч.</th>
-        </tr></thead>
-        <tbody>
-          {levelResults.map(lr=>{const isBest=lr.lv.name===r.lv.name;return(<tr key={lr.lv.name} style={{borderBottom:"1px solid #1e293b",background:isBest?"rgba(168,85,247,0.12)":"transparent"}}>
-            <td style={{padding:"6px 8px",color:isBest?"#a855f7":"#94a3b8",fontWeight:isBest?700:400}}>{shortName(lr.lv.name)}{isBest?" ★":""}</td>
-            <td style={{textAlign:"center",padding:"6px 4px",color:isBest?"#a855f7":"#e2e8f0",fontWeight:isBest?700:600}}>{lr.tot.toFixed(1)}</td>
-            <td style={{textAlign:"center",padding:"6px 4px",color:"#14b8a6",fontSize:11}}>{lr.sC}</td>
-            <td style={{textAlign:"center",padding:"6px 4px",color:"#f59e0b",fontSize:11}}>{lr.dC}</td>
-            <td style={{textAlign:"center",padding:"6px 4px",color:"#94a3b8",fontSize:11}}>{lr.credited.length}</td>
-          </tr>);})}
-        </tbody>
-      </table>
-    </div>}</>}
-
-    {/* Breakdown panel */}
-    {all.length>0&&<><button onClick={()=>setShowBreak(!showBreak)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Расшифровка баллов ({shortName(r.lv.name)})</span><span style={{transform:showBreak?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
+    {/* Breakdown panel (без уровней) */}
+    {all.length>0&&<><button onClick={()=>setShowBreak(!showBreak)} style={{width:"100%",padding:"12px",background:"#1e293b",border:"1px solid #334155",borderRadius:12,color:"#94a3b8",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span>Расшифровка баллов</span><span style={{transform:showBreak?"rotate(180deg)":"none",transition:"transform 0.2s"}}>&#9660;</span></button>
     {showBreak&&<div style={{padding:16,background:"#0f172a",border:"1px solid #334155",borderRadius:12,marginBottom:12,fontSize:12}}>
-      <div style={{color:"#64748b",marginBottom:4}}>Диапазон засчитанных: <b style={{color:"#e2e8f0"}}>{r.lv.num-1} — {r.lv.num+2.5} баллов</b></div>
-      <div style={{color:"#64748b",marginBottom:12}}>Баланс по <b style={{color:"#e2e8f0"}}>засчитанным</b> ({r.credited.length} шт.)</div>
+      <div style={{color:"#64748b",marginBottom:12}}>Все уникальные элементы засчитываются ({r.credited.length} шт.)</div>
       <table style={{width:"100%",borderCollapse:"collapse"}}>
         <thead><tr style={{borderBottom:"1px solid #334155"}}>
           <th style={{textAlign:"left",padding:"4px 6px",color:"#64748b",fontWeight:500}}>Элемент</th>
           <th style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontWeight:500,width:40}}>Балл</th>
           <th style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontWeight:500,width:60}}>Тип</th>
-          <th style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontWeight:500,width:30}}></th>
         </tr></thead>
         <tbody>
           {r.credited.map(e=>(<tr key={e.name} style={{borderBottom:"1px solid #1e293b"}}>
             <td style={{padding:"4px 6px",color:"#e2e8f0"}}>{e.name}</td>
             <td style={{textAlign:"center",padding:"4px 6px",color:"#14b8a6",fontWeight:600}}>{e.score}</td>
             <td style={{textAlign:"center",padding:"4px 6px",color:e.cat==="Статика"?"#14b8a6":"#f59e0b",fontSize:10}}>{e.cat==="Статика"?"Стат":"Дин"}</td>
-            <td style={{textAlign:"center",color:"#22c55e"}}>+</td>
           </tr>))}
-          {(()=>{const excluded=all.filter(e=>e.score<r.lv.num-1||e.score>r.lv.num+2.5);return excluded.map(e=>(<tr key={e.name} style={{borderBottom:"1px solid #1e293b",opacity:0.5}}>
-            <td style={{padding:"4px 6px",color:"#ef4444",textDecoration:"line-through"}}>{e.name}</td>
-            <td style={{textAlign:"center",padding:"4px 6px",color:"#ef4444"}}>{e.score}</td>
-            <td style={{textAlign:"center",padding:"4px 6px",color:"#64748b",fontSize:10}}>{e.cat==="Статика"?"Стат":"Дин"}</td>
-            <td style={{textAlign:"center",color:"#ef4444",fontSize:10}}>вне</td>
-          </tr>));})()}
         </tbody>
       </table>
       <div style={{borderTop:"1px solid #334155",marginTop:8,paddingTop:8}}>
         <div style={{display:"flex",justifyContent:"space-between",color:"#94a3b8",marginBottom:2}}>
-          <span>Засчитанные элементы</span><span style={{color:"#e2e8f0",fontWeight:600}}>{r.raw.toFixed(1)}</span>
+          <span>Элементы</span><span style={{color:"#e2e8f0",fontWeight:600}}>{r.raw.toFixed(1)}</span>
         </div>
         <div style={{display:"flex",justifyContent:"space-between",color:"#94a3b8",marginBottom:2}}>
           <span>Баланс (стат:{r.sC} / дин:{r.dC})</span><span style={{color:"#14b8a6",fontWeight:600}}>+{r.b.toFixed(2)}</span>
@@ -765,9 +722,6 @@ function App(){
           <span>ИТОГО</span><span>{r.tot.toFixed(2)}</span>
         </div>
       </div>
-      {(()=>{const excluded=all.filter(e=>e.score<r.lv.num-1||e.score>r.lv.num+2.5);return excluded.length>0?<div style={{marginTop:8,padding:"6px 10px",background:"rgba(239,68,68,0.08)",borderRadius:8,color:"#f59e0b",fontSize:11}}>
-        {excluded.length} эл. вне диапазона [{r.lv.num-1}–{r.lv.num+2.5}]: не засчитаны
-      </div>:null;})()}
     </div>}</>}
 
     {/* Voice input */}
@@ -815,12 +769,12 @@ function App(){
     {/* Модалка выбора элемента для штрафа */}
     {penaltyPicker&&<PenaltyPickerModal type={penaltyPicker.type} slots={slots} slotNames={SN} onApply={(slotIdx,elementIdx,elementName,note)=>{addPenaltyEvent(penaltyPicker.type,slotIdx,elementIdx,elementName,note);setPenaltyPicker(null);}} onApplyUnlinked={(note)=>{addPenaltyEvent(penaltyPicker.type,null,null,null,note);setPenaltyPicker(null);}} onClose={()=>setPenaltyPicker(null)}/>}
 
-    {/* Result + protocol buttons */}
-    {all.length>0&&(<div style={{marginTop:24,padding:20,borderRadius:16,textAlign:"center",background:isDQ?"linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05))":"linear-gradient(135deg,rgba(168,85,247,0.15),rgba(168,85,247,0.05))",border:`1px solid ${isDQ?"rgba(239,68,68,0.3)":"rgba(168,85,247,0.3)"}`}}><div style={{fontSize:18,fontWeight:700,color:isDQ?"#ef4444":"#a855f7"}}>{isDQ?"ДИСКВАЛИФИКАЦИЯ":"Разряд: "+r.lv.name}</div><div style={{fontSize:12,color:"#64748b",marginTop:4}}>{isDQ?"0 баллов — не участвует в призах":"Итого: "+r.tot.toFixed(1)+" баллов"}</div>
+    {/* Result + protocol buttons (открытые соревнования) */}
+    {all.length>0&&(<div style={{marginTop:24,padding:20,borderRadius:16,textAlign:"center",background:isDQ?"linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05))":"linear-gradient(135deg,rgba(245,158,11,0.15),rgba(245,158,11,0.05))",border:`1px solid ${isDQ?"rgba(239,68,68,0.3)":"rgba(245,158,11,0.3)"}`}}><div style={{fontSize:18,fontWeight:700,color:isDQ?"#ef4444":"#f59e0b"}}>{isDQ?"ДИСКВАЛИФИКАЦИЯ":"Итого: "+r.tot.toFixed(1)+" баллов"}</div><div style={{fontSize:12,color:"#64748b",marginTop:4}}>{isDQ?"0 баллов — не участвует в призах":r.credited.length+" уникальных элементов"}</div>
       <button onClick={()=>{
         const d=new Date().toLocaleDateString("ru-RU");
-        let txt="ПРОТОКОЛ WU (Судья) — "+d+"\n";
-        txt+="Разряд: "+(isDQ?"— (ДСК)":r.lv.name)+" | Пол: "+(g==="M"?"Мужчины":"Женщины")+"\n";
+        let txt="ПРОТОКОЛ WU (Открытые) — "+d+"\n";
+        txt+="Пол: "+(g==="M"?"Мужчины":"Женщины")+"\n";
         if(isDQ)txt+="Результат: ДИСКВАЛИФИКАЦИЯ\n";
         txt+="═══════════════════════════\n";
         slots.forEach((s,i)=>{if(!s.length)return;txt+="\n"+(SN[i]||("Связка "+(i+1)))+":\n";s.forEach(el=>{txt+="  "+el.name+" ("+el.cat+", "+el.score+" б.)\n";});});
@@ -836,37 +790,35 @@ function App(){
           });
           txt+="Итого штрафов: -"+penaltyScore+" б.\n";
         }
-        txt+="\nБаллы по уровням:\n";
-        levelResults.forEach(lr=>{txt+=shortName(lr.lv.name)+": "+lr.tot.toFixed(1)+(lr.lv.name===r.lv.name?" ★":"")+"\n";});
-        if(navigator.share){navigator.share({title:"Протокол WU (Судья)",text:txt}).catch(()=>{});}
+        if(navigator.share){navigator.share({title:"Протокол WU (Открытые)",text:txt}).catch(()=>{});}
         else{navigator.clipboard.writeText(txt).then(()=>{}).catch(()=>{const w=window.open();if(w){const p=w.document.createElement("pre");p.textContent=txt;w.document.body.appendChild(p);}});}
-      }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(168,85,247,0.3)",background:"rgba(168,85,247,0.1)",color:"#a855f7",fontSize:13,fontWeight:600,cursor:"pointer"}}>Протокол</button>
+      }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(245,158,11,0.3)",background:"rgba(245,158,11,0.1)",color:"#f59e0b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Протокол</button>
       {selAthlete&&<button onClick={()=>{
         const a=compAthletes.find(x=>x.id===selAthlete);if(!a)return;
         const statika=r.credited.filter(e=>e.cat==="Статика").reduce((s,e)=>s+e.score,0);
         const dynamika=r.credited.filter(e=>e.cat==="Динамика").reduce((s,e)=>s+e.score,0);
         const creditedNames=r.credited.map(e=>e.name);
-        const excludedNames=all.filter(e=>e.score<r.lv.num-1||e.score>r.lv.num+2.5).map(e=>e.name);
         const log={
-          slots:slots.map(s=>s.map(e=>({name:e.name,score:e.score,cat:e.cat,credited:creditedNames.includes(e.name)}))),
+          slots:slots.map(s=>s.map(e=>({name:e.name,score:e.score,cat:e.cat,credited:true}))),
           penaltyEvents:penalties.events.map(ev=>({type:ev.type,slotIdx:ev.slotIdx,elementIdx:ev.elementIdx,elementName:ev.elementName,note:ev.note})),
           totalPenalty:penaltyScore,
           dsk:isDQ,
           creditedNames,
-          excludedNames,
-          level:r.lv.name,
-          levelRange:[r.lv.num-1,r.lv.num+2.5],
+          excludedNames:[],
+          level:null,
+          levelRange:null,
           raw:Math.round(r.raw*100)/100,
           balance:Math.round(r.b*100)/100,
           total:Math.round(r.tot*100)/100,
-          judgedAt:new Date().toISOString()
+          judgedAt:new Date().toISOString(),
+          competition:"open"
         };
-        sendToProtocol({...a,level:r.lv.name},{statika,dynamika,combo:Math.round(r.b*100)/100,universality:0,creative:0,dirty:dirtyCount,fall:fallCount,dsk:isDQ,comboCheck:true,minElCheck:true,penalties:penaltyScore,total:Math.round(r.tot*100)/100,passed:!isDQ,log});
-        setProtocolSent("В протокол: "+a.name+" — "+(isDQ?"ДСК":r.lv.name+" — "+r.tot.toFixed(1)+" б."));
+        sendToOpenProtocol(a,{statika,dynamika,combo:Math.round(r.b*100)/100,universality:0,creative:0,dirty:dirtyCount,fall:fallCount,dsk:isDQ,penalties:penaltyScore,total:Math.round(r.tot*100)/100,passed:!isDQ,log});
+        setProtocolSent("В протокол: "+a.name+" — "+(isDQ?"ДСК":r.tot.toFixed(1)+" б."));
         setTimeout(()=>setProtocolSent(""),4000);
-      }} style={{marginTop:8,marginLeft:8,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(168,85,247,0.3)",background:"rgba(168,85,247,0.1)",color:"#a855f7",fontSize:13,fontWeight:600,cursor:"pointer"}}>В протокол</button>}
+      }} style={{marginTop:8,marginLeft:8,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(245,158,11,0.3)",background:"rgba(245,158,11,0.1)",color:"#f59e0b",fontSize:13,fontWeight:600,cursor:"pointer"}}>В протокол</button>}
     </div>)}
-    <div style={{textAlign:"center",padding:"32px 0 16px",fontSize:11,color:"#334155"}}>WU Judge v2 — Авто-разряд по max баллов — {ELS.length} эл.</div>
+    <div style={{textAlign:"center",padding:"32px 0 16px",fontSize:11,color:"#334155"}}>WU Open Calc v1 — {ELS.length} эл.</div>
   </div></div>);
 }
 

@@ -790,7 +790,60 @@ function BaseJudging({athlete,otj,setOtj,podt,setPodt,br,setBr,pl,setPl,pres,set
 }
 
 /* ========== TAB 3: PROTOCOL ========== */
+function PerformanceLogModal({result,onClose}){
+  const log=result.log;
+  if(!log)return null;
+  return <div onClick={onClose} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(2,6,23,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(145deg,#1e293b,#0f172a)",borderRadius:16,padding:20,maxWidth:560,width:"100%",maxHeight:"90vh",overflowY:"auto",border:"1px solid #334155",color:"#e2e8f0",fontSize:13}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+        <div>
+          <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0"}}>{result.name}</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{result.group} · {result.sex==="ж"?"Ж":"М"} · {result.age} лет · <b style={{color:log.dsk?"#ef4444":"#a855f7"}}>{log.dsk?"ДСК":log.level}</b> · <b style={{color:"#f59e0b"}}>{log.total}</b> б.</div>
+        </div>
+        <button onClick={onClose} style={{width:28,height:28,borderRadius:8,border:"1px solid #334155",background:"#0f172a",color:"#94a3b8",fontSize:14,cursor:"pointer"}}>×</button>
+      </div>
+
+      {log.dsk&&<div style={{padding:"10px 12px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,color:"#ef4444",fontWeight:600,marginBottom:12}}>ДИСКВАЛИФИКАЦИЯ — баллы не учитываются</div>}
+
+      <div style={{fontSize:11,color:"#64748b",marginBottom:6,textTransform:"uppercase",fontWeight:600}}>Диапазон засчитанных: {log.levelRange?log.levelRange[0]+"–"+log.levelRange[1]:"—"} баллов</div>
+
+      {log.slots.map((slot,si)=>slot.length>0?<div key={si} style={{marginBottom:12,padding:12,background:"#0f172a",border:"1px solid #334155",borderRadius:10}}>
+        <div style={{fontSize:11,color:"#a855f7",fontWeight:700,marginBottom:8,textTransform:"uppercase"}}>Связка {si+1}</div>
+        {slot.map((el,ei)=>{
+          const penalty=log.penaltyEvents.find(p=>p.slotIdx===si&&p.elementIdx===ei);
+          return <div key={ei} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 8px",marginBottom:4,background:el.credited?"rgba(20,184,166,0.06)":"rgba(100,116,139,0.06)",borderLeft:`3px solid ${el.credited?"#14b8a6":"#475569"}`,borderRadius:6}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
+              <span style={{color:"#64748b",fontSize:11,minWidth:18}}>{ei+1}.</span>
+              <span style={{color:el.credited?"#e2e8f0":"#64748b",textDecoration:el.credited?"none":"line-through"}}>{el.name}</span>
+              <span style={{color:el.cat==="Статика"?"#14b8a6":"#f59e0b",fontSize:11}}>({el.cat==="Статика"?"Стат":"Дин"} {el.score}б)</span>
+              {!el.credited&&<span style={{color:"#ef4444",fontSize:10,fontStyle:"italic"}}>вне диапазона</span>}
+            </div>
+            {penalty&&<span style={{fontSize:11,color:"#ef4444",fontWeight:600,whiteSpace:"nowrap"}}>
+              {penalty.type==="dirty"?"грязь −2":"падение −4"}{penalty.note?" ("+penalty.note+")":""}
+            </span>}
+          </div>;
+        })}
+      </div>:null)}
+
+      {log.penaltyEvents.filter(p=>p.slotIdx===null).length>0&&<div style={{marginBottom:12,padding:12,background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10}}>
+        <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>Штрафы без привязки</div>
+        {log.penaltyEvents.filter(p=>p.slotIdx===null).map((p,i)=><div key={i} style={{fontSize:12,color:"#e2e8f0",marginBottom:2}}>• {p.type==="dirty"?"Грязь −2":"Падение −4"}{p.note?" ("+p.note+")":""}</div>)}
+      </div>}
+
+      <div style={{padding:12,background:"#0f172a",border:"1px solid #334155",borderRadius:10,fontSize:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#94a3b8"}}>Элементы</span><span style={{fontWeight:600}}>{log.raw}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#94a3b8"}}>Баланс</span><span style={{color:"#14b8a6",fontWeight:600}}>+{log.balance}</span></div>
+        {log.totalPenalty>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#94a3b8"}}>Штрафы</span><span style={{color:"#ef4444",fontWeight:600}}>−{log.totalPenalty}</span></div>}
+        <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid #334155",paddingTop:6,marginTop:6,fontWeight:700}}><span>ИТОГО</span><span style={{color:log.dsk?"#ef4444":"#f59e0b"}}>{log.total}</span></div>
+      </div>
+
+      {log.judgedAt&&<div style={{marginTop:10,fontSize:10,color:"#475569",textAlign:"center"}}>Судейство: {new Date(log.judgedAt).toLocaleString("ru-RU")}</div>}
+    </div>
+  </div>;
+}
+
 function ProtocolTab({freestyleResults,baseResults}){
+  const [logResult,setLogResult]=useState(null);
   const sortedF=useMemo(()=>[...freestyleResults].sort((a,b)=>b.total-a.total),[freestyleResults]);
   const sortedB=useMemo(()=>[...baseResults].sort((a,b)=>b.score-a.score),[baseResults]);
 
@@ -816,7 +869,7 @@ function ProtocolTab({freestyleResults,baseResults}){
     <div className="section-title">FREESTYLE</div>
     {sortedF.length===0?<div className="card"><div className="empty">Нет результатов freestyle</div></div>:
     <div className="card"><div className="table-wrap"><table>
-      <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Стат</th><th>Дин</th><th>Комбо</th><th>Унив</th><th>Креатив</th><th>Штрафы</th><th>Балл</th><th title="Мин. элементов разряда">Мин.эл</th><th title="Комбо из 3+ элементов">Комбо 3+</th><th title="Набрано / нужно баллов">Мин.балл</th><th>Результат</th></tr></thead>
+      <thead><tr><th>№</th><th>Гр</th><th>ФИО</th><th>Уровень</th><th>Стат</th><th>Дин</th><th>Комбо</th><th>Унив</th><th>Креатив</th><th>Штрафы</th><th>Балл</th><th title="Мин. элементов разряда">Мин.эл</th><th title="Комбо из 3+ элементов">Комбо 3+</th><th title="Набрано / нужно баллов">Мин.балл</th><th>Результат</th><th title="Разбор выступления"></th></tr></thead>
       <tbody>{sortedF.map((r,i)=>{const lvl=LEVELS.find(l=>l.name===r.level)||{minEl:0,minM:0,minF:0};const minScore=r.sex==="ж"?lvl.minF:lvl.minM;const scoreOk=r.total>=minScore;return <tr key={i} className={r.passed?"row-pass":"row-fail"}>
         <td>{r.id}</td><td>{r.group}</td><td>{r.name}</td><td>{r.level}</td>
         <td>{r.statika}</td><td>{r.dynamika}</td><td>{r.combo}</td><td>{r.universality}</td><td>{r.creative}</td>
@@ -826,8 +879,10 @@ function ProtocolTab({freestyleResults,baseResults}){
         <td style={{textAlign:"center"}}><span style={{color:r.comboCheck?"#22c55e":"#ef4444",fontWeight:700}}>{r.comboCheck?"✅":"❌"}</span></td>
         <td style={{textAlign:"center"}}><span style={{color:scoreOk?"#22c55e":"#ef4444",fontWeight:700}}>{scoreOk?"✅":"❌"}</span><div style={{fontSize:10,color:"#64748b"}}>{minScore}</div></td>
         <td><span className={r.passed?"badge badge-pass":"badge badge-fail"}>{r.dsk?"ДСК":r.passed?"Сдал":"Не сдал"}</span></td>
+        <td style={{textAlign:"center"}}>{r.log?<button onClick={()=>setLogResult(r)} title="Разбор выступления" style={{width:28,height:28,borderRadius:6,border:"1px solid #334155",background:"rgba(168,85,247,0.1)",color:"#a855f7",fontSize:14,cursor:"pointer"}}>🔍</button>:<span style={{color:"#334155",fontSize:10}}>—</span>}</td>
       </tr>})}</tbody>
     </table></div></div>}
+    {logResult&&<PerformanceLogModal result={logResult} onClose={()=>setLogResult(null)}/>}
 
     <div className="section-title">БАЗОВЫЕ</div>
     {sortedB.length===0?<div className="card"><div className="empty">Нет результатов base</div></div>:
