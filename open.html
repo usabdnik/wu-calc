@@ -469,16 +469,27 @@ function JudgeBaseTab({athletes,baseResults,setBaseResults,showToast}){
 function ProtocolTab({athletes,fsResults,setFsResults,baseResults,setBaseResults}){
   const [logResult,setLogResult]=useState(null);
   const absentIds=new Set(athletes.filter(a=>a.present===false).map(a=>a.id));
+  /* Источник истины для пола/возраста — athletes; результаты могли сохраниться со старым sex */
+  const athleteByKey=useMemo(()=>{
+    const byId=new Map(),byName=new Map();
+    athletes.forEach(a=>{byId.set(String(a.id),a);if(a.name)byName.set(a.name.trim().toLowerCase(),a);});
+    return{byId,byName};
+  },[athletes]);
+  function resolveSexAge(r){
+    const a=athleteByKey.byId.get(String(r.id))||athleteByKey.byName.get(String(r.name||"").trim().toLowerCase());
+    return{sex:a?a.sex:r.sex,age:a?a.age:r.age};
+  }
 
   const fsGrouped=useMemo(()=>{
     const groups={};
     for(const code of FREESTYLE_CAT_ORDER)groups[code]={label:null,items:[]};
     for(const r of fsResults){
       if(absentIds.has(r.id))continue;
-      const c=getFreestyleCategory(r.sex,r.age);
+      const {sex,age}=resolveSexAge(r);
+      const c=getFreestyleCategory(sex,age);
       if(!groups[c.code])groups[c.code]={label:c.label,items:[]};
       groups[c.code].label=c.label;
-      groups[c.code].items.push(r);
+      groups[c.code].items.push({...r,sex,age});
     }
     Object.values(groups).forEach(g=>g.items.sort((a,b)=>b.total-a.total));
     return groups;
@@ -489,10 +500,11 @@ function ProtocolTab({athletes,fsResults,setFsResults,baseResults,setBaseResults
     for(const code of BASE_CAT_ORDER)groups[code]={label:null,items:[]};
     for(const r of baseResults){
       if(absentIds.has(r.id))continue;
-      const c=getBaseCategory(r.sex,r.age);
+      const {sex,age}=resolveSexAge(r);
+      const c=getBaseCategory(sex,age);
       if(!groups[c.code])groups[c.code]={label:c.label,items:[]};
       groups[c.code].label=c.label;
-      groups[c.code].items.push(r);
+      groups[c.code].items.push({...r,sex,age});
     }
     Object.values(groups).forEach(g=>g.items.sort((a,b)=>b.total-a.total));
     return groups;
@@ -550,6 +562,9 @@ function ProtocolTab({athletes,fsResults,setFsResults,baseResults,setBaseResults
 /* ========== ТАБ 4: ПРИЗЁРЫ ========== */
 function WinnersTab({athletes,fsResults,baseResults}){
   const absentIds=new Set(athletes.filter(a=>a.present===false).map(a=>a.id));
+  /* Источник истины для пола/возраста — athletes; результаты могли сохраниться со старым sex */
+  const athleteById=new Map(athletes.map(a=>[String(a.id),a]));
+  const athleteByName=new Map(athletes.filter(a=>a.name).map(a=>[a.name.trim().toLowerCase(),a]));
 
   function groupAndTop(results,orderArr,catFn){
     const groups={};
@@ -557,10 +572,13 @@ function WinnersTab({athletes,fsResults,baseResults}){
     for(const r of results){
       if(absentIds.has(r.id))continue;
       if(r.dsk)continue; /* ДСК не в призы */
-      const c=catFn(r.sex,r.age);
+      const a=athleteById.get(String(r.id))||athleteByName.get(String(r.name||"").trim().toLowerCase());
+      const sex=a?a.sex:r.sex;
+      const age=a?a.age:r.age;
+      const c=catFn(sex,age);
       if(!groups[c.code])groups[c.code]={label:c.label,top:[]};
       groups[c.code].label=c.label;
-      groups[c.code].top.push(r);
+      groups[c.code].top.push({...r,sex,age});
     }
     Object.values(groups).forEach(g=>{g.top.sort((a,b)=>b.total-a.total);g.top=g.top.slice(0,3);});
     return groups;
