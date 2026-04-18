@@ -248,15 +248,15 @@ async function postVoiceFlag(id,user_flag,user_corrections){
 (function(){const s=LS.get("wu-ai");if(!s||!s.url||!s.key)LS.set("wu-ai",{url:"https://api.workoutudm.ru",key:"nCD14A5ZsJwRqpeX4-5qcJa2O52RVVI10CoL_8C-QDg"});})();
 
 /* ── Protocol integration (открытые соревнования) ── */
-function getOpenAthletes(){try{const v=localStorage.getItem("open_athletes");return v?JSON.parse(v):[];}catch{return[];}}
-function sendToOpenProtocol(athlete,data){
+/* Читаем open_athletes (источник истины для протокола open.html): только freestyle===true && present!==false */
+function getOpenAthletes(){try{const v=localStorage.getItem("open_athletes");const arr=v?JSON.parse(v):[];return Array.isArray(arr)?arr.filter(a=>a&&a.freestyle===true&&a.present!==false):[];}catch{return[];}}
+/* Отправка в протокол: ключ open_freestyle_results, спецификация entry — см. CLAUDE.md + comment ниже */
+function sendToOpenProtocol(entry){
   const key="open_freestyle_results";
-  let results=[];try{results=JSON.parse(localStorage.getItem(key))||[];}catch{}
-  const idx=results.findIndex(r=>r.id===athlete.id);
-  const entry={athleteIdx:0,id:athlete.id,group:athlete.group,name:athlete.name,sex:athlete.sex,age:athlete.age,level:athlete.level,...data};
-  try{const all=JSON.parse(localStorage.getItem("open_athletes"))||[];const ai=all.findIndex(a=>a.id===athlete.id);if(ai>=0)entry.athleteIdx=ai;}catch{}
+  let results=[];try{const parsed=JSON.parse(localStorage.getItem(key))||[];results=Array.isArray(parsed)?parsed:[];}catch{}
+  const idx=results.findIndex(r=>r.id===entry.id);
   if(idx>=0)results[idx]=entry;else results.push(entry);
-  localStorage.setItem(key,JSON.stringify(results));
+  try{localStorage.setItem(key,JSON.stringify(results));}catch(e){}
 }
 
 /* ── Открытые соревнования: авто-подбор разряда по max(tot) ── */
@@ -647,9 +647,11 @@ function App(){
   const[penalties,setPenalties]=useState({events:[],dq:false});
   const[penaltyPicker,setPenaltyPicker]=useState(null); /* null | {type:"dirty"|"fall"} */
   const[selAthlete,setSelAthlete]=useState("");
-  const[protocolSent,setProtocolSent]=useState("");
-  /* Только участники с галочкой "Фристайл" */
-  const compAthletes=useMemo(()=>getOpenAthletes().filter(a=>a.freestyle!==false),[]);
+  const[combo,setCombo]=useState(0);
+  const[creativity,setCreativity]=useState(0);
+  const[toast,setToast]=useState("");
+  /* Участники из open_athletes: freestyle===true && present!==false (см. getOpenAthletes) */
+  const compAthletes=useMemo(()=>getOpenAthletes(),[]);
   /* Голосовой addPenalty — без привязки к элементу (slotIdx=null). Ручная привязка делается через penaltyPicker UI. */
   const addPenalty=useCallback((type)=>{
     if(type==="dq"){setPenalties(p=>({...p,dq:true}));return;}
@@ -700,7 +702,6 @@ function App(){
         <option value="">— Без привязки —</option>
         {compAthletes.map(a=><option key={a.id} value={a.id}>{a.name} ({a.sex==="ж"?"Ж":"М"}, {a.age} лет)</option>)}
       </select>
-      {protocolSent&&<div style={{fontSize:12,color:"#22c55e",marginTop:6,textAlign:"center"}}>{protocolSent}</div>}
     </div>}
 
     <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:16}}>{["M","F"].map(x=>(<button key={x} onClick={()=>setG(x)} style={{padding:"8px 28px",borderRadius:10,border:"none",cursor:"pointer",fontSize:14,fontWeight:600,background:g===x?(x==="M"?"#14b8a6":"#f472b6"):"#1e293b",color:g===x?"#020617":"#64748b",transition:"all 0.2s"}}>{x==="M"?"Мужчины":"Женщины"}</button>))}</div>
@@ -842,31 +843,72 @@ function App(){
         if(navigator.share){navigator.share({title:"Протокол WU (Открытые)",text:txt}).catch(()=>{});}
         else{navigator.clipboard.writeText(txt).then(()=>{}).catch(()=>{const w=window.open();if(w){const p=w.document.createElement("pre");p.textContent=txt;w.document.body.appendChild(p);}});}
       }} style={{marginTop:12,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(245,158,11,0.3)",background:"rgba(245,158,11,0.1)",color:"#f59e0b",fontSize:13,fontWeight:600,cursor:"pointer"}}>Протокол</button>
-      {selAthlete&&<button onClick={()=>{
-        const a=compAthletes.find(x=>x.id===selAthlete);if(!a)return;
-        const statika=r.credited.filter(e=>e.cat==="Статика").reduce((s,e)=>s+e.score,0);
-        const dynamika=r.credited.filter(e=>e.cat==="Динамика").reduce((s,e)=>s+e.score,0);
-        const creditedNames=r.credited.map(e=>e.name);
-        const log={
-          slots:slots.map(s=>s.map(e=>({name:e.name,score:e.score,cat:e.cat,credited:true}))),
-          penaltyEvents:penalties.events.map(ev=>({type:ev.type,slotIdx:ev.slotIdx,elementIdx:ev.elementIdx,elementName:ev.elementName,note:ev.note})),
-          totalPenalty:penaltyScore,
-          dsk:isDQ,
-          creditedNames,
-          excludedNames:[],
-          level:r.level?r.level.name:null,
-          levelRange:r.levelRange,
+    </div>)}
+
+    {/* Combo / Creativity (открытые соревнования) — валидация по rankNumber из max(tot) */}
+    {(() => {
+      const rankNumber=(!isDQ&&r.level)?r.level.num:null;
+      const hasEls=all.length>0;
+      const comboOver=rankNumber!=null&&combo>rankNumber;
+      const creatOver=rankNumber!=null&&creativity>rankNumber;
+      const selObj=selAthlete?compAthletes.find(x=>x.id===selAthlete):null;
+      const canSubmit=!!selObj&&(isDQ||(hasEls&&!comboOver&&!creatOver&&rankNumber!=null));
+      const submit=()=>{
+        if(!canSubmit||!selObj||(!isDQ&&!r.level))return;
+        const entry={
+          id:selObj.id,
+          name:selObj.name,
+          sex:selObj.sex,
+          age:selObj.age,
+          rank:r.level?r.level.name:null,
+          rankNumber:r.level?r.level.num:null,
           raw:Math.round(r.raw*100)/100,
           balance:Math.round(r.b*100)/100,
-          total:Math.round(r.tot*100)/100,
-          judgedAt:new Date().toISOString(),
-          competition:"open"
+          penalties:penaltyScore,
+          combo:combo,
+          creativity:creativity,
+          total:isDQ?0:Math.round((r.raw+r.b-penaltyScore+combo+creativity)*100)/100,
+          dsk:!!isDQ,
+          ts:Date.now()
         };
-        sendToOpenProtocol(a,{statika,dynamika,combo:Math.round(r.b*100)/100,universality:0,creative:0,dirty:dirtyCount,fall:fallCount,dsk:isDQ,penalties:penaltyScore,total:Math.round(r.tot*100)/100,passed:!isDQ,log});
-        setProtocolSent("В протокол: "+a.name+" — "+(isDQ?"ДСК":r.tot.toFixed(1)+" б."));
-        setTimeout(()=>setProtocolSent(""),4000);
-      }} style={{marginTop:8,marginLeft:8,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(245,158,11,0.3)",background:"rgba(245,158,11,0.1)",color:"#f59e0b",fontSize:13,fontWeight:600,cursor:"pointer"}}>В протокол</button>}
-    </div>)}
+        sendToOpenProtocol(entry);
+        setToast(isDQ?"ДСК отправлено в протокол":"Отправлено в протокол");
+        setTimeout(()=>setToast(""),2000);
+      };
+      const fieldBase={flex:1,padding:"10px 12px",background:"#0f172a",borderRadius:8,color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box"};
+      const okBorder="1px solid #334155";
+      const errBorder="1px solid #ef4444";
+      const hintBadge=(hasEls&&rankNumber!=null)?String(rankNumber):"—";
+      return(<div style={{marginTop:16,padding:16,background:"#1e293b",borderRadius:8,border:"1px solid #334155"}}>
+        <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.05em"}}>Комбо и Креатив</div>
+        <div style={{display:"flex",gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Комбо</label>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <input type="number" min="0" step="1" value={combo} disabled={!hasEls}
+                onChange={e=>setCombo(Math.max(0,parseInt(e.target.value)||0))}
+                onBlur={e=>setCombo(Math.max(0,parseInt(e.target.value)||0))}
+                style={{...fieldBase,border:comboOver?errBorder:okBorder,opacity:hasEls?1:0.5}}/>
+              <span title={hasEls?("Лимит: "+hintBadge):"Добавьте элементы"} style={{minWidth:34,textAlign:"center",padding:"4px 8px",borderRadius:8,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:13,fontWeight:700}}>{hintBadge}</span>
+            </div>
+          </div>
+          <div style={{flex:1}}>
+            <label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Креатив</label>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <input type="number" min="0" step="1" value={creativity} disabled={!hasEls}
+                onChange={e=>setCreativity(Math.max(0,parseInt(e.target.value)||0))}
+                onBlur={e=>setCreativity(Math.max(0,parseInt(e.target.value)||0))}
+                style={{...fieldBase,border:creatOver?errBorder:okBorder,opacity:hasEls?1:0.5}}/>
+              <span title={hasEls?("Лимит: "+hintBadge):"Добавьте элементы"} style={{minWidth:34,textAlign:"center",padding:"4px 8px",borderRadius:8,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:13,fontWeight:700}}>{hintBadge}</span>
+            </div>
+          </div>
+        </div>
+        {(comboOver||creatOver)&&<div style={{fontSize:11,color:"#ef4444",marginBottom:8}}>Лимит: {hintBadge} (по текущему разряду)</div>}
+        {canSubmit&&<button onClick={submit} title={canSubmit?"":("Лимит: "+hintBadge)} style={{width:"100%",padding:"12px",borderRadius:8,border:isDQ?"1px solid rgba(239,68,68,0.4)":"1px solid rgba(245,158,11,0.4)",background:isDQ?"linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.08))":"linear-gradient(135deg,rgba(245,158,11,0.2),rgba(245,158,11,0.08))",color:isDQ?"#ef4444":"#f59e0b",fontSize:14,fontWeight:700,cursor:"pointer"}}>{isDQ?"Отправить (ДСК)":"Отправить в протокол"}</button>}
+        {!canSubmit&&selObj&&hasEls&&(comboOver||creatOver)&&<button disabled title={"Лимит: "+hintBadge} style={{width:"100%",padding:"12px",borderRadius:8,border:"1px solid #334155",background:"#0f172a",color:"#64748b",fontSize:14,fontWeight:700,cursor:"not-allowed"}}>Отправить в протокол</button>}
+        {toast&&<div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.3)",color:"#22c55e",fontSize:12,textAlign:"center",fontWeight:600}}>{toast}</div>}
+      </div>);
+    })()}
     <div style={{textAlign:"center",padding:"32px 0 16px",fontSize:11,color:"#334155"}}>WU Open Calc v1 — {ELS.length} эл.</div>
   </div></div>);
 }

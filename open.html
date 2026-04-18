@@ -184,10 +184,14 @@ function AthletesTab({athletes,setAthletes,showToast}){
   const [form,setForm]=useState({name:"",sex:"м",age:10,group:""});
   const [csvText,setCsvText]=useState("");
   const [showCsv,setShowCsv]=useState(false);
+  const [showServer,setShowServer]=useState(false);
+  const [serverDate,setServerDate]=useState("2026-04-18");
+  const [serverLoading,setServerLoading]=useState(false);
+  const [serverPreview,setServerPreview]=useState(null);
 
   function addAthlete(){
     if(!form.name.trim()){showToast("Укажи ФИО");return;}
-    const a={id:"open_"+Date.now()+"_"+Math.floor(Math.random()*1000),name:form.name.trim(),sex:form.sex,age:parseInt(form.age)||0,group:form.group.trim()||"—",present:true,freestyle:true,base:true};
+    const a={id:"open_"+Date.now()+"_"+Math.floor(Math.random()*1000),name:form.name.trim(),sex:form.sex,age:parseInt(form.age)||0,group:form.group.trim()||"—",present:true,freestyle:false,base:false};
     setAthletes([...athletes,a]);
     setForm({name:"",sex:"м",age:10,group:""});
     showToast("Добавлен: "+a.name);
@@ -213,13 +217,57 @@ function AthletesTab({athletes,setAthletes,showToast}){
       const sex=sexRaw.toLowerCase().startsWith("ж")||sexRaw.toLowerCase().startsWith("f")?"ж":"м";
       const age=parseInt(ageRaw)||0;
       if(!name||!age)continue;
-      parsed.push({id:"open_"+Date.now()+"_"+parsed.length+"_"+Math.floor(Math.random()*1000),name,sex,age,group:groupRaw||"—",present:true,freestyle:true,base:true});
+      parsed.push({id:"open_"+Date.now()+"_"+parsed.length+"_"+Math.floor(Math.random()*1000),name,sex,age,group:groupRaw||"—",present:true,freestyle:false,base:false});
     }
     if(parsed.length===0){showToast("Ничего не распарсено");return;}
     setAthletes([...athletes,...parsed]);
     setCsvText("");
     setShowCsv(false);
     showToast("Добавлено: "+parsed.length);
+  }
+
+  async function loadFromServer(){
+    setServerLoading(true);
+    try{
+      const API_BASE="https://api.workoutudm.ru/api/competition";
+      const API_KEY="SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE";
+      const res=await fetch(`${API_BASE}/athletes?date=${encodeURIComponent(serverDate)}`,{headers:{"X-API-Key":API_KEY}});
+      if(!res.ok){const txt=await res.text();throw new Error(`${res.status}: ${txt.slice(0,200)}`);}
+      const data=await res.json();
+      const count=data.count||0;
+      if(count===0){showToast(`На дату ${serverDate} записей нет`);setServerLoading(false);return;}
+      setServerPreview(data);
+    }catch(e){showToast("Ошибка: "+e.message);}
+    setServerLoading(false);
+  }
+
+  function applyServerData(mode){
+    if(!serverPreview)return;
+    const incoming=(serverPreview.athletes||[]).map(a=>({
+      id:String(a.id),
+      name:a.name,
+      sex:(a.sex||"м").toLowerCase().startsWith("ж")?"ж":"м",
+      age:parseInt(a.age)||0,
+      group:a.group||"—",
+      present:true,
+      freestyle:false,
+      base:false
+    }));
+    if(mode==="replace"){
+      setAthletes(incoming);
+    }else{
+      const map=new Map(athletes.map(a=>[String(a.id),a]));
+      for(const a of incoming){
+        if(map.has(a.id)){
+          const old=map.get(a.id);
+          map.set(a.id,{...old,name:a.name,sex:a.sex,age:a.age||old.age,group:a.group||old.group});
+        }else{map.set(a.id,a);}
+      }
+      setAthletes(Array.from(map.values()));
+    }
+    showToast(`Загружено ${incoming.length} участников с сервера`);
+    setServerPreview(null);
+    setShowServer(false);
   }
 
   function clearAll(){
@@ -232,8 +280,12 @@ function AthletesTab({athletes,setAthletes,showToast}){
   }
 
   const presentCount=athletes.filter(a=>a.present!==false).length;
+  const totalCount=athletes.length;
+  const fsCount=athletes.filter(a=>a.present!==false&&a.freestyle===true).length;
+  const baseCount=athletes.filter(a=>a.present!==false&&a.base===true).length;
 
   return <div>
+    <div style={{fontSize:12,color:"#94a3b8",padding:"6px 2px",borderBottom:"1px solid #334155",marginBottom:12}}>Участники: {presentCount}/{totalCount} · ФС: {fsCount} · ОП: {baseCount}</div>
     <div className="card">
       <h3 style={{color:"#f59e0b",marginBottom:12}}>Добавить участника</h3>
       <div className="form-row">
@@ -243,15 +295,43 @@ function AthletesTab({athletes,setAthletes,showToast}){
         <div className="form-group"><label>Группа</label><input type="text" value={form.group} onChange={e=>setForm({...form,group:e.target.value})} placeholder="—"/></div>
         <button className="btn btn-primary" onClick={addAthlete}>+ Добавить</button>
       </div>
-      <div style={{marginTop:8}}>
+      <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
         <button className="btn btn-secondary btn-sm" onClick={()=>setShowCsv(!showCsv)}>{showCsv?"Скрыть":"Импорт CSV"}</button>
-        {showCsv&&<div style={{marginTop:12}}>
-          <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>Формат: <code>ФИО;пол(м/ж);возраст;группа</code> — по одной записи в строке</div>
-          <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} placeholder="Иванов Иван;м;12;А-1&#10;Петрова Мария;ж;14;Б-2"/>
-          <button className="btn btn-primary btn-sm" style={{marginTop:8}} onClick={importCsv}>Импортировать</button>
-        </div>}
+        <button className="btn btn-primary btn-sm" onClick={()=>setShowServer(!showServer)}>{showServer?"Скрыть":"Загрузить с сервера"}</button>
       </div>
+      {showCsv&&<div style={{marginTop:12}}>
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>Формат: <code>ФИО;пол(м/ж);возраст;группа</code> — по одной записи в строке</div>
+        <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} placeholder="Иванов Иван;м;12;А-1&#10;Петрова Мария;ж;14;Б-2"/>
+        <button className="btn btn-primary btn-sm" style={{marginTop:8}} onClick={importCsv}>Импортировать</button>
+      </div>}
+      {showServer&&<div style={{marginTop:12,padding:12,background:"#0f172a",borderRadius:8,border:"1px solid #334155"}}>
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>Автосборка спортсменов из МойКласс на выбранную дату</div>
+        <div className="form-row" style={{alignItems:"flex-end"}}>
+          <div className="form-group" style={{flex:1}}>
+            <label>Дата</label>
+            <input type="date" value={serverDate} onChange={e=>setServerDate(e.target.value)}/>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={loadFromServer} disabled={serverLoading}>{serverLoading?"Загрузка…":"OK"}</button>
+        </div>
+      </div>}
     </div>
+
+    {serverPreview&&<div onClick={()=>setServerPreview(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(2,6,23,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#1e293b",borderRadius:12,padding:20,maxWidth:520,width:"100%",maxHeight:"90vh",overflowY:"auto",border:"1px solid #334155"}}>
+        <h3 style={{color:"#f59e0b",marginBottom:12}}>Загрузка с сервера</h3>
+        <p style={{marginBottom:8}}>Найдено <strong>{serverPreview.count}</strong> на <strong>{serverPreview.date}</strong></p>
+        <div style={{maxHeight:240,overflowY:"auto",border:"1px solid #334155",borderRadius:8,marginBottom:12}}>
+          <table><thead><tr><th>ФИО</th><th>Пол</th><th>Возр</th><th>Группа</th></tr></thead>
+          <tbody>{serverPreview.athletes.map((a,i)=><tr key={i}><td>{a.name}</td><td>{(a.sex||"").toLowerCase().startsWith("ж")?"Ж":"М"}</td><td>{a.age}</td><td>{a.group}</td></tr>)}</tbody></table>
+        </div>
+        <p style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>Текущий список: <strong>{athletes.length}</strong> чел. «Заменить» — удалит текущих. «Объединить» — обновит по ID, новых добавит.</p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button className="btn btn-primary btn-sm" onClick={()=>{if(athletes.length>0&&!confirm(`Заменить текущий список (${athletes.length} чел.) на новый (${serverPreview.count})?`))return;applyServerData("replace");}}>Заменить ({serverPreview.count})</button>
+          <button className="btn btn-secondary btn-sm" onClick={()=>applyServerData("merge")}>Объединить</button>
+          <button className="btn btn-secondary btn-sm" onClick={()=>setServerPreview(null)}>Отмена</button>
+        </div>
+      </div>
+    </div>}
 
     <div className="card">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -413,11 +493,13 @@ function ProtocolTab({athletes,fsResults,setFsResults,baseResults,setBaseResults
     {FREESTYLE_CAT_ORDER.map(code=>{const g=fsGrouped[code];if(!g||g.items.length===0)return null;return <div key={code} className="card">
       <h4 style={{color:"#f59e0b",marginBottom:10}}>{g.label} ({g.items.length})</h4>
       <div className="table-wrap"><table>
-        <thead><tr><th>#</th><th>ФИО</th><th>Гр</th><th>Возр.</th><th>Балл</th><th>Штрафы</th><th></th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>ФИО</th><th>Гр</th><th>Возр.</th><th>Комбо</th><th>Креатив</th><th>Балл</th><th>Штрафы</th><th></th><th></th></tr></thead>
         <tbody>{g.items.map((r,i)=>(<tr key={r.id}>
           <td style={{fontWeight:700,color:i===0?"#fbbf24":i===1?"#94a3b8":i===2?"#cd7f32":"#64748b"}}>{i+1}</td>
           <td>{r.name}</td><td>{r.group}</td><td>{r.age}</td>
-          <td style={{fontWeight:700,color:"#f59e0b"}}>{r.total}</td>
+          <td>{r.combo ?? 0}</td>
+          <td>{r.creativity ?? 0}</td>
+          <td style={{fontWeight:700,color:"#f59e0b"}}>{r.total ?? ((r.raw||0)+(r.balance||0)-(r.penalties||0)+(r.combo||0)+(r.creativity||0))}</td>
           <td style={{color:"#ef4444"}}>{r.penalties>0?`-${r.penalties}`:""}{r.dsk?" ДСК":""}</td>
           <td>{r.log?<button className="btn btn-sm btn-secondary" onClick={()=>setLogResult(r)} title="Разбор">🔍</button>:<span style={{color:"#334155"}}>—</span>}</td>
           <td><button className="btn btn-danger btn-sm" onClick={()=>removeFs(r.id)}>×</button></td>
