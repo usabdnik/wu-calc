@@ -181,7 +181,7 @@ function App(){
     <div className="tabs">{tabs.map(t=>(<button key={t.id} className={tab===t.id?"active":""} onClick={()=>setTab(t.id)}>{t.label}</button>))}</div>
 
     <div className="container">
-      {tab==="athletes"&&<AthletesTab athletes={athletes} setAthletes={setAthletes} showToast={showToast}/>}
+      {tab==="athletes"&&<AthletesTab athletes={athletes} setAthletes={setAthletes} fsResults={fsResults} setFsResults={setFsResults} baseResults={baseResults} setBaseResults={setBaseResults} showToast={showToast}/>}
       {tab==="judge_base"&&<JudgeBaseTab athletes={athletes} baseResults={baseResults} setBaseResults={setBaseResults} showToast={showToast}/>}
       {tab==="protocol"&&<ProtocolTab athletes={athletes} fsResults={fsResults} setFsResults={setFsResults} baseResults={baseResults} setBaseResults={setBaseResults}/>}
       {tab==="winners"&&<WinnersTab athletes={athletes} fsResults={fsResults} baseResults={baseResults}/>}
@@ -193,7 +193,7 @@ function App(){
 }
 
 /* ========== ТАБ 1: УЧАСТНИКИ ========== */
-function AthletesTab({athletes,setAthletes,showToast}){
+function AthletesTab({athletes,setAthletes,fsResults,setFsResults,baseResults,setBaseResults,showToast}){
   const [form,setForm]=useState({name:"",sex:"м",age:10,group:""});
   const [csvText,setCsvText]=useState("");
   const [showCsv,setShowCsv]=useState(false);
@@ -212,6 +212,12 @@ function AthletesTab({athletes,setAthletes,showToast}){
 
   function updateAthlete(id,patch){
     setAthletes(athletes.map(a=>a.id===id?{...a,...patch}:a));
+    /* Синк пола/возраста в уже сохранённые результаты, чтобы Протокол/Призёры пересчитались */
+    if("sex"in patch||"age"in patch||"name"in patch){
+      const syncPatch=Object.fromEntries(Object.entries(patch).filter(([k])=>k==="sex"||k==="age"||k==="name"));
+      if(setFsResults)setFsResults(prev=>prev.map(r=>r.id===id?{...r,...syncPatch}:r));
+      if(setBaseResults)setBaseResults(prev=>prev.map(r=>r.id===id?{...r,...syncPatch}:r));
+    }
   }
 
   function removeAthlete(id){
@@ -357,7 +363,7 @@ function AthletesTab({athletes,setAthletes,showToast}){
         <tbody>
           {athletes.map(a=>{const fc=getFreestyleCategory(a.sex,a.age);const bc=getBaseCategory(a.sex,a.age);return <tr key={a.id} style={a.present===false?{opacity:0.5}:{}}>
             <td>{a.name}</td>
-            <td><span className={"badge "+(a.sex==="ж"?"badge-female":"badge-male")}>{a.sex==="ж"?"Ж":"М"}</span></td>
+            <td><select value={a.sex} onChange={e=>updateAthlete(a.id,{sex:e.target.value})} style={{width:56,padding:"4px 6px",background:a.sex==="ж"?"rgba(236,72,153,0.15)":"rgba(59,130,246,0.15)",border:"1px solid #334155",borderRadius:6,color:a.sex==="ж"?"#ec4899":"#3b82f6",fontWeight:700}}><option value="м">М</option><option value="ж">Ж</option></select></td>
             <td><input type="number" value={a.age} onChange={e=>updateAthlete(a.id,{age:parseInt(e.target.value)||0})} style={{width:60}}/></td>
             <td><input type="text" value={a.group} onChange={e=>updateAthlete(a.id,{group:e.target.value})} style={{width:80}}/></td>
             <td><label className={"chk "+(a.freestyle?"on":"")}><input type="checkbox" checked={a.freestyle!==false} onChange={e=>updateAthlete(a.id,{freestyle:e.target.checked})}/>ФС</label></td>
