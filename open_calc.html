@@ -898,9 +898,9 @@ function App(){
           <div style={{flex:1}}>
             <label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Комбо</label>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <input type="number" min="0" step="1" value={combo} disabled={!hasEls}
-                onChange={e=>setCombo(Math.max(0,parseInt(e.target.value)||0))}
-                onBlur={e=>setCombo(Math.max(0,parseInt(e.target.value)||0))}
+              <input type="text" inputMode="decimal" value={combo} disabled={!hasEls}
+                onChange={e=>{const v=parseFloat(String(e.target.value).replace(',','.'));setCombo(isNaN(v)?0:Math.max(0,v));}}
+                onBlur={e=>{const v=parseFloat(String(e.target.value).replace(',','.'));setCombo(isNaN(v)?0:Math.max(0,v));}}
                 style={{...fieldBase,border:comboOver?errBorder:okBorder,opacity:hasEls?1:0.5}}/>
               <span title={hasEls?("Лимит: "+hintBadge):"Добавьте элементы"} style={{minWidth:34,textAlign:"center",padding:"4px 8px",borderRadius:8,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:13,fontWeight:700}}>{hintBadge}</span>
             </div>
@@ -908,9 +908,9 @@ function App(){
           <div style={{flex:1}}>
             <label style={{fontSize:11,color:"#64748b",display:"block",marginBottom:4}}>Креатив</label>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <input type="number" min="0" step="1" value={creativity} disabled={!hasEls}
-                onChange={e=>setCreativity(Math.max(0,parseInt(e.target.value)||0))}
-                onBlur={e=>setCreativity(Math.max(0,parseInt(e.target.value)||0))}
+              <input type="text" inputMode="decimal" value={creativity} disabled={!hasEls}
+                onChange={e=>{const v=parseFloat(String(e.target.value).replace(',','.'));setCreativity(isNaN(v)?0:Math.max(0,v));}}
+                onBlur={e=>{const v=parseFloat(String(e.target.value).replace(',','.'));setCreativity(isNaN(v)?0:Math.max(0,v));}}
                 style={{...fieldBase,border:creatOver?errBorder:okBorder,opacity:hasEls?1:0.5}}/>
               <span title={hasEls?("Лимит: "+hintBadge):"Добавьте элементы"} style={{minWidth:34,textAlign:"center",padding:"4px 8px",borderRadius:8,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:13,fontWeight:700}}>{hintBadge}</span>
             </div>
