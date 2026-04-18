@@ -9,6 +9,19 @@
 <meta name="apple-mobile-web-app-title" content="WU Open">
 <link rel="manifest" href="manifest.json">
 <title>WU Калькулятор (Открытые)</title>
+<script>
+/* One-shot cache/SW purge to force fresh version (v10+). Removes self after. */
+(function(){
+  var MARK='wu_opencalc_purged_v10';
+  if(localStorage.getItem(MARK))return;
+  try{
+    if(navigator.serviceWorker){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister()})})}
+    if(window.caches){caches.keys().then(function(ns){ns.forEach(function(n){caches.delete(n)})})}
+  }catch(e){}
+  localStorage.setItem(MARK,'1');
+  setTimeout(function(){location.reload()},600);
+})();
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#020617;font-family:system-ui,-apple-system,sans-serif;color:#e2e8f0;overflow-x:hidden}
