@@ -868,6 +868,17 @@ function App(){
       const canSubmit=!!selObj&&(isDQ||(hasEls&&!comboOver&&!creatOver&&rankNumber!=null));
       const submit=()=>{
         if(!canSubmit||!selObj||(!isDQ&&!r.level))return;
+        const totalVal=isDQ?0:Math.round((r.raw+r.b-penaltyScore+combo+creativity)*100)/100;
+        const log={
+          slots:(slots||[]).map(slot=>(slot||[]).map(el=>({name:el.name,score:el.score,level:el.score,cat:el.cat,category:el.cat==="Статика"?"static":"dynamic"}))),
+          penaltyEvents:(penalties&&penalties.events?penalties.events:[]).map(ev=>({slotIdx:ev.slotIdx,elementIdx:ev.elementIdx,elementName:ev.elementName,type:ev.type,note:ev.note||null})),
+          raw:Math.round(r.raw*100)/100,
+          balance:Math.round(r.b*100)/100,
+          totalPenalty:penaltyScore,
+          total:totalVal,
+          dsk:!!isDQ,
+          judgedAt:Date.now()
+        };
         const entry={
           id:selObj.id,
           name:selObj.name,
@@ -880,8 +891,9 @@ function App(){
           penalties:penaltyScore,
           combo:combo,
           creativity:creativity,
-          total:isDQ?0:Math.round((r.raw+r.b-penaltyScore+combo+creativity)*100)/100,
+          total:totalVal,
           dsk:!!isDQ,
+          log:log,
           ts:Date.now()
         };
         sendToOpenProtocol(entry);
