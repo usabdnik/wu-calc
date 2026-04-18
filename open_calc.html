@@ -271,6 +271,18 @@ function sendToOpenProtocol(entry){
   if(idx>=0)results[idx]=entry;else results.push(entry);
   try{localStorage.setItem(key,JSON.stringify(results));}catch(e){}
 }
+/* Множество id уже засуженных участников — для отметки "✓" в выпадашке */
+function getJudgedFsIds(){try{const v=localStorage.getItem("open_freestyle_results");const arr=v?JSON.parse(v):[];return new Set(Array.isArray(arr)?arr.map(r=>r.id).filter(Boolean):[]);}catch{return new Set();}}
+/* Возрастные категории фристайла (дубль из open.html — чтобы не тянуть зависимость) */
+function getFsCategory(sex,age){
+  const a=parseInt(age)||0;
+  if(sex==="ж")return{code:"girls_all",label:"Девочки"};
+  if(a<=10)return{code:"boys_u10",label:"Мальчики до 10"};
+  if(a<=14)return{code:"boys_11_14",label:"Мальчики 11–14"};
+  return{code:"boys_15plus",label:"Мальчики 15+"};
+}
+const FS_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus"];
+const FS_CAT_LABELS={girls_all:"Девочки",boys_u10:"Мальчики до 10",boys_11_14:"Мальчики 11–14",boys_15plus:"Мальчики 15+"};
 
 /* ── Открытые соревнования: авто-подбор разряда по max(tot) ── */
 /* Freestyle-уровни (1..10), без Biginner/Diligent (это base). */
@@ -664,7 +676,21 @@ function App(){
   const[creativity,setCreativity]=useState("");
   const[toast,setToast]=useState("");
   /* Участники из open_athletes: freestyle===true && present!==false (см. getOpenAthletes) */
-  const compAthletes=useMemo(()=>getOpenAthletes(),[]);
+  const[compAthletes,setCompAthletes]=useState(()=>getOpenAthletes());
+  const[judgedFsIds,setJudgedFsIds]=useState(()=>getJudgedFsIds());
+  /* Обновляем список участников и отметки "✓" при возврате фокуса на вкладку (после сохранения в протокол) */
+  useEffect(()=>{
+    const onFocus=()=>{setCompAthletes(getOpenAthletes());setJudgedFsIds(getJudgedFsIds());};
+    window.addEventListener("focus",onFocus);
+    document.addEventListener("visibilitychange",onFocus);
+    return()=>{window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
+  },[]);
+  /* Группировка участников по возрастной категории для optgroup */
+  const compAthletesByCat=useMemo(()=>{
+    const g={};FS_CAT_ORDER.forEach(c=>{g[c]=[];});
+    compAthletes.forEach(a=>{const c=getFsCategory(a.sex,a.age).code;if(g[c])g[c].push(a);});
+    return g;
+  },[compAthletes]);
   /* Голосовой addPenalty — без привязки к элементу (slotIdx=null). Ручная привязка делается через penaltyPicker UI. */
   const addPenalty=useCallback((type)=>{
     if(type==="dq"){setPenalties(p=>({...p,dq:true}));return;}
@@ -710,10 +736,20 @@ function App(){
     {showAI&&<AISettings/>}
 
     {compAthletes.length>0&&<div style={{marginBottom:16,padding:12,background:"#1e293b",borderRadius:12,border:"1px solid #334155"}}>
-      <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Участник (открытые соревнования)</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Участник (открытые соревнования)</div>
+        <div style={{fontSize:10,color:"#64748b"}}>засужено {judgedFsIds.size}/{compAthletes.length}</div>
+      </div>
       <select value={selAthlete} onChange={e=>{const v=e.target.value;setSelAthlete(v);if(v){const a=compAthletes.find(x=>x.id===v);if(a)setG(a.sex==="ж"?"F":"M");}}} style={{width:"100%",padding:"10px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:10,color:"#e2e8f0",fontSize:14,cursor:"pointer"}}>
         <option value="">— Без привязки —</option>
-        {compAthletes.map(a=><option key={a.id} value={a.id}>{a.name} ({a.sex==="ж"?"Ж":"М"}, {a.age} лет)</option>)}
+        {FS_CAT_ORDER.map(code=>{
+          const list=compAthletesByCat[code]||[];
+          if(list.length===0)return null;
+          const unjudgedCount=list.filter(a=>!judgedFsIds.has(a.id)).length;
+          return <optgroup key={code} label={`${FS_CAT_LABELS[code]} (${unjudgedCount} осталось / ${list.length})`}>
+            {list.map(a=>{const done=judgedFsIds.has(a.id);return <option key={a.id} value={a.id} style={done?{color:"#22c55e"}:{}}>{done?"✓ ":""}{a.name} ({a.sex==="ж"?"Ж":"М"}, {a.age} лет)</option>;})}
+          </optgroup>;
+        })}
       </select>
     </div>}
 
@@ -900,6 +936,7 @@ function App(){
           ts:Date.now()
         };
         sendToOpenProtocol(entry);
+        setJudgedFsIds(prev=>{const n=new Set(prev);n.add(entry.id);return n;});
         setToast(isDQ?"ДСК отправлено в протокол":"Отправлено в протокол");
         setTimeout(()=>setToast(""),2000);
       };
