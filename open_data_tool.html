@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex,nofollow"/>
+<title>WU Open Data Tool</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101820;color:#eef3f8;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.45}
+a{color:#f0b429}
+.wrap{max-width:1120px;margin:0 auto;padding:20px}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:18px}
+h1{font-size:24px;margin:0 0 6px;color:#f0b429}
+h2{font-size:16px;margin:0 0 10px;color:#f0b429}
+p{margin:0 0 10px;color:#b7c4cf}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.panel{border:1px solid #2c3e4a;border-radius:8px;background:#18242e;padding:14px}
+.panel.full{grid-column:1/-1}
+.danger{border-color:#8b2c2c;background:#251b1b}
+.ok{border-color:#2d6a4f;background:#16261f}
+.muted{color:#8fa2b2;font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+button,.file{border:1px solid #415766;border-radius:8px;background:#22313b;color:#eef3f8;padding:9px 12px;font-weight:650;cursor:pointer}
+button.primary{background:#f0b429;color:#111;border-color:#f0b429}
+button.danger{background:#b91c1c;border-color:#b91c1c}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{max-width:100%;color:#b7c4cf}
+input[type=text],select{border:1px solid #415766;border-radius:8px;background:#101820;color:#eef3f8;padding:9px 10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid #2c3e4a;padding:7px 8px;text-align:left;vertical-align:top}
+th{color:#8fa2b2;font-weight:650}
+code{background:#101820;border:1px solid #2c3e4a;border-radius:6px;padding:1px 5px;color:#f0b429}
+pre{white-space:pre-wrap;overflow:auto;max-height:320px;background:#101820;border:1px solid #2c3e4a;border-radius:8px;padding:10px;color:#b7c4cf}
+.badge{display:inline-block;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:750}
+.badge.add{background:#173923;color:#5ee091}
+.badge.conflict{background:#442020;color:#ff9b9b}
+.badge.skip{background:#2b3440;color:#a8b7c4}
+.badge.unknown{background:#42361d;color:#ffd27a}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.top{display:block}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>WU Open Data Tool</h1>
+      <p>Экспорт, проверка и аккуратное объединение данных открытых соревнований.</p>
+    </div>
+    <div class="muted">Рабочие ключи: <code>open_athletes</code>, <code>open_freestyle_results</code>, <code>open_base_results</code></div>
+  </div>
+
+  <div class="panel danger">
+    <h2>Правило безопасности</h2>
+    <p>MacBook с базой и управлением соревнованиями считаем золотым источником. Этот инструмент не меняет данные сам по себе. Запись в localStorage выполняется только кнопкой «Применить merged» после ввода подтверждения.</p>
+  </div>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="panel ok full">
+      <h2>Быстро через облако</h2>
+      <p>На Mac с фристайлом отправь данные в облако. На основном Mac загрузи их как Source и запусти dry-run merge.</p>
+      <div class="row">
+        <label>Код обмена <input id="cloudEventId" type="text"/></label>
+        <button class="primary" id="uploadCloud">Отправить фристайл в облако</button>
+        <button id="loadCloud">Загрузить Source из облака</button>
+      </div>
+      <div id="cloudStatus" class="muted"></div>
+    </div>
+
+    <div class="panel">
+      <h2>1. Экспорт текущего компьютера</h2>
+      <p>Открой эту страницу на том же адресе GitHub Pages, где открывался протокол, и скачай снимок данных.</p>
+      <div class="row">
+        <button class="primary" id="exportCurrent">Скачать snapshot текущего браузера</button>
+        <button id="useCurrentAsGolden">Взять текущие как Golden</button>
+      </div>
+      <div id="currentSummary" class="muted"></div>
+    </div>
+
+    <div class="panel">
+      <h2>2. Загрузка двух snapshots</h2>
+      <p>Golden = MacBook. Source = другой компьютер с результатами фристайла.</p>
+      <div class="row">
+        <label>Golden JSON <input id="goldenFile" type="file" accept=".json,application/json"/></label>
+      </div>
+      <div class="row">
+        <label>Source JSON <input id="sourceFile" type="file" accept=".json,application/json"/></label>
+      </div>
+      <div class="row">
+        <label>Конфликты:
+          <select id="conflictPolicy">
+            <option value="keep-golden">оставить Golden, только отчёт</option>
+            <option value="source-wins">заменить фристайл Source</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <h2>3. Dry-run merge</h2>
+      <p>Правила: участники и база берутся из Golden. Из Source добавляются только результаты фристайла. Матчинг идёт по <code>id</code>, затем по уникальному ФИО. Неизвестные участники не добавляются автоматически.</p>
+      <div class="row">
+        <button class="primary" id="runMerge">Проверить и собрать merged</button>
+        <button id="downloadMerged" disabled>Скачать merged JSON</button>
+        <button id="downloadPublic" disabled>Скачать публичный HTML протокол</button>
+      </div>
+      <div id="mergeSummary"></div>
+    </div>
+
+    <div class="panel full danger">
+      <h2>4. Применить merged на этом браузере</h2>
+      <p>Перед применением автоматически скачается backup текущего браузера. После применения открой <a href="open.html" target="_blank">open.html</a> и проверь протокол/призёров.</p>
+      <div class="row">
+        <input id="applyConfirm" type="text" placeholder="напиши ПРИМЕНИТЬ"/>
+        <button class="danger" id="applyMerged" disabled>Применить merged в localStorage</button>
+      </div>
+      <div id="applyStatus" class="muted"></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Журнал</h2>
+      <pre id="log"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEYS=["open_athletes","open_freestyle_results","open_base_results"];
+const CLOUD_API_BASE="https://api.workoutudm.ru/api/competition";
+const CLOUD_API_KEY="SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE";
+const FREESTYLE_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus"];
+const BASE_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus_triathlon"];
+const BASE_COEF={otj:0.5,press:0.5,podt:2,br:1,vyh:3};
+const EXERCISE_LABEL={otj:"Отжимания",press:"Пресс",podt:"Подтягивания",br:"Отж. брусья",vyh:"Выходы"};
+
+let goldenData=null;
+let sourceData=null;
+let mergedData=null;
+let lastReport=null;
+
+function $(id){return document.getElementById(id);}
+function log(msg){$("log").textContent+=msg+"\\n";}
+function safeParse(raw,def){try{return JSON.parse(raw)}catch{return def}}
+function arr(v){return Array.isArray(v)?v:[]}
+function nowStamp(){return new Date().toISOString().replace(/[:.]/g,"-")}
+function norm(s){return String(s||"").toLowerCase().replace(/ё/g,"е").replace(/[.,;:!?()\\[\\]{}\"'`]/g," ").replace(/\\s+/g," ").trim()}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+function defaultCloudEventId(){return "wu-open-transfer-"+new Date().toISOString().slice(0,10).replace(/-/g,"")}
+function initCloudEventId(){
+  const saved=localStorage.getItem("open_cloud_event_id")||"";
+  $("cloudEventId").value=saved||defaultCloudEventId();
+}
+function getCloudEventId(){
+  const id=$("cloudEventId").value.trim();
+  if(!/^[a-zA-Z0-9-]{1,64}$/.test(id))throw new Error("Код обмена: только латиница, цифры и дефис, до 64 символов");
+  localStorage.setItem("open_cloud_event_id",id);
+  return id;
+}
+function setCloudStatus(msg){$("cloudStatus").textContent=msg;}
+function cloudHeaders(){return{"Content-Type":"application/json","X-API-Key":CLOUD_API_KEY};}
+function getCloudDeviceId(){
+  let id=localStorage.getItem("comp_device_id");
+  if(!id){id=crypto.randomUUID();localStorage.setItem("comp_device_id",id);}
+  return id;
+}
+function hashKey(s){
+  let h=2166136261;
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+  return (h>>>0).toString(36);
+}
+function recordKey(item,type,i){
+  const raw=String((item&&item.id)||(item&&item.name)||`${type}-${i}`);
+  return raw.length<=32?raw:`${raw.slice(0,23)}-${hashKey(raw).slice(0,8)}`;
+}
+function jsonSize(obj){return new Blob([JSON.stringify(obj)]).size;}
+function compactRecord(type,item){
+  if(jsonSize(item)<=9500)return item;
+  if(type==="freestyle_results"){
+    const copy={...item};
+    delete copy.log;
+    copy.log_trimmed=true;
+    return copy;
+  }
+  return item;
+}
+function recordsForCloud(data){
+  const now=new Date().toISOString();
+  const records=[];
+  const add=(recordType,items)=>{
+    arr(items).forEach((item,i)=>{
+      const data=compactRecord(recordType,item);
+      if(jsonSize(data)>9500)throw new Error(`Запись слишком большая для облака: ${recordType} ${recordKey(item,recordType,i)}`);
+      records.push({record_type:recordType,record_key:recordKey(item,recordType,i),data,updated_at:now});
+    });
+  };
+  add("athletes",data.open_athletes);
+  add("freestyle_results",data.open_freestyle_results);
+  return records;
+}
+function readCurrent(){
+  const data={};
+  for(const k of KEYS)data[k]=safeParse(localStorage.getItem(k)||"[]",[]);
+  return wrapData(data,"browser-localStorage");
+}
+function wrapData(data,source){
+  return {
+    kind:"wu-open-data",
+    version:1,
+    exportedAt:new Date().toISOString(),
+    source,
+    open_athletes:arr(data.open_athletes),
+    open_freestyle_results:arr(data.open_freestyle_results),
+    open_base_results:arr(data.open_base_results)
+  };
+}
+function unwrapData(raw,label){
+  const data=typeof raw==="string"?JSON.parse(raw):raw;
+  const source=data.source||label;
+  const result=wrapData({
+    open_athletes: Array.isArray(data.open_athletes)?data.open_athletes:safeParse(data.open_athletes||"[]",[]),
+    open_freestyle_results: Array.isArray(data.open_freestyle_results)?data.open_freestyle_results:safeParse(data.open_freestyle_results||"[]",[]),
+    open_base_results: Array.isArray(data.open_base_results)?data.open_base_results:safeParse(data.open_base_results||"[]",[])
+  },source);
+  return result;
+}
+function summary(d){
+  if(!d)return "не загружено";
+  return `участники: ${arr(d.open_athletes).length}, фристайл: ${arr(d.open_freestyle_results).length}, база: ${arr(d.open_base_results).length}, export: ${d.exportedAt||"?"}`;
+}
+function downloadJSON(name,obj){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function downloadText(name,text,type="text/html"){
+  const blob=new Blob([text],{type});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function readFile(file,label){
+  const text=await file.text();
+  return unwrapData(text,label);
+}
+
+function getFreestyleCategory(sex,age){
+  const a=parseInt(age)||0;
+  if(sex==="ж")return {code:"girls_all",label:"Девочки"};
+  if(a<=10)return {code:"boys_u10",label:"Мальчики до 10"};
+  if(a<=14)return {code:"boys_11_14",label:"Мальчики 11–14"};
+  return {code:"boys_15plus",label:"Мальчики 15+"};
+}
+function getBaseCategory(sex,age){
+  const a=parseInt(age)||0;
+  if(sex==="ж")return {code:"girls_all",label:"Девочки"};
+  if(a<=10)return {code:"boys_u10",label:"Мальчики до 10"};
+  if(a<=14)return {code:"boys_11_14",label:"Мальчики 11–14"};
+  return {code:"boys_15plus_triathlon",label:"Мальчики 15+ (троеборье)"};
+}
+
+function buildAthleteIndex(athletes){
+  const byId=new Map();
+  const names=new Map();
+  for(const a of athletes){
+    byId.set(String(a.id),a);
+    const n=norm(a.name);
+    if(!n)continue;
+    if(!names.has(n))names.set(n,[]);
+    names.get(n).push(a);
+  }
+  const byNameUnique=new Map();
+  for(const [n,list] of names.entries())if(list.length===1)byNameUnique.set(n,list[0]);
+  return{byId,byNameUnique,names};
+}
+function canonicalResult(r,a){
+  return {
+    ...r,
+    id:String(a.id),
+    name:a.name,
+    sex:a.sex,
+    age:a.age,
+    group:a.group||r.group||"—"
+  };
+}
+function comparableResult(r){
+  const copy={...r};
+  delete copy.ts;
+  if(copy.log)copy.log={...copy.log};
+  return JSON.stringify(copy);
+}
+function mergeOpenData(golden,source,policy){
+  const gAth=arr(golden.open_athletes);
+  const gFs=arr(golden.open_freestyle_results);
+  const gBase=arr(golden.open_base_results);
+  const sFs=arr(source.open_freestyle_results);
+  const idx=buildAthleteIndex(gAth);
+  const fsById=new Map(gFs.map(r=>[String(r.id),r]));
+  const report={added:[],conflicts:[],skipped:[],unknown:[],rewritten:[]};
+
+  for(const r0 of sFs){
+    let athlete=idx.byId.get(String(r0.id));
+    let match="id";
+    if(!athlete){
+      athlete=idx.byNameUnique.get(norm(r0.name));
+      match=athlete?"name":"none";
+    }
+    if(!athlete){
+      report.unknown.push({id:r0.id,name:r0.name,total:r0.total});
+      continue;
+    }
+    const r=canonicalResult(r0,athlete);
+    if(match==="name"&&String(r0.id)!==String(athlete.id)){
+      report.rewritten.push({fromId:r0.id,toId:athlete.id,name:athlete.name,total:r.total});
+    }
+    const existing=fsById.get(String(athlete.id));
+    if(!existing){
+      fsById.set(String(athlete.id),r);
+      report.added.push({id:athlete.id,name:athlete.name,total:r.total,match});
+      continue;
+    }
+    const existingCanon=canonicalResult(existing,athlete);
+    if(comparableResult(existingCanon)===comparableResult(r)){
+      report.skipped.push({id:athlete.id,name:athlete.name,total:r.total,reason:"same"});
+      continue;
+    }
+    report.conflicts.push({
+      id:athlete.id,
+      name:athlete.name,
+      goldenTotal:existing.total,
+      sourceTotal:r.total,
+      goldenTs:existing.ts||existing.judgedAt||existing.log?.judgedAt||null,
+      sourceTs:r.ts||r.judgedAt||r.log?.judgedAt||null
+    });
+    if(policy==="source-wins")fsById.set(String(athlete.id),r);
+  }
+
+  const merged=wrapData({
+    open_athletes:gAth,
+    open_freestyle_results:Array.from(fsById.values()),
+    open_base_results:gBase
+  },"merged-golden-plus-source-freestyle");
+  merged.mergeMeta={
+    mergedAt:new Date().toISOString(),
+    goldenExportedAt:golden.exportedAt||null,
+    sourceExportedAt:source.exportedAt||null,
+    conflictPolicy:policy,
+    report
+  };
+  return{merged,report};
+}
+
+function renderReport(report){
+  const rows=[
+    ["Добавлено фристайла",report.added.length,"add"],
+    ["Конфликты",report.conflicts.length,"conflict"],
+    ["Пропущено без изменений",report.skipped.length,"skip"],
+    ["Неизвестные участники",report.unknown.length,"unknown"],
+    ["ID переписан по ФИО",report.rewritten.length,"unknown"]
+  ];
+  let html=`<table><tbody>${rows.map(r=>`<tr><td><span class="badge ${r[2]}">${r[0]}</span></td><td>${r[1]}</td></tr>`).join("")}</tbody></table>`;
+  if(report.conflicts.length){
+    html+=`<h2 style="margin-top:14px">Конфликты фристайла</h2><table><thead><tr><th>ФИО</th><th>Golden</th><th>Source</th><th>Golden ts</th><th>Source ts</th></tr></thead><tbody>`;
+    html+=report.conflicts.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.goldenTotal)}</td><td>${esc(c.sourceTotal)}</td><td>${esc(c.goldenTs||"")}</td><td>${esc(c.sourceTs||"")}</td></tr>`).join("");
+    html+=`</tbody></table>`;
+  }
+  if(report.unknown.length){
+    html+=`<h2 style="margin-top:14px">Не добавлены: нет участника в Golden</h2><table><thead><tr><th>ID</th><th>ФИО</th><th>Балл</th></tr></thead><tbody>`;
+    html+=report.unknown.map(u=>`<tr><td>${esc(u.id)}</td><td>${esc(u.name)}</td><td>${esc(u.total)}</td></tr>`).join("");
+    html+=`</tbody></table>`;
+  }
+  $("mergeSummary").innerHTML=html;
+}
+
+function groupResults(data,kind){
+  const athletes=arr(data.open_athletes);
+  const athleteById=new Map(athletes.map(a=>[String(a.id),a]));
+  const athleteByName=new Map(athletes.filter(a=>a.name).map(a=>[norm(a.name),a]));
+  const absentIds=new Set(athletes.filter(a=>a.present===false).map(a=>String(a.id)));
+  const order=kind==="fs"?FREESTYLE_CAT_ORDER:BASE_CAT_ORDER;
+  const catFn=kind==="fs"?getFreestyleCategory:getBaseCategory;
+  const results=kind==="fs"?arr(data.open_freestyle_results):arr(data.open_base_results);
+  const groups={};
+  for(const code of order)groups[code]={label:null,items:[]};
+  for(const r of results){
+    if(absentIds.has(String(r.id)))continue;
+    const a=athleteById.get(String(r.id))||athleteByName.get(norm(r.name));
+    const sex=a?a.sex:r.sex;
+    const age=a?a.age:r.age;
+    const c=catFn(sex,age);
+    if(!groups[c.code])groups[c.code]={label:c.label,items:[]};
+    groups[c.code].label=c.label;
+    groups[c.code].items.push({...r,sex,age,group:(a&&a.group)||r.group});
+  }
+  Object.values(groups).forEach(g=>g.items.sort((a,b)=>(b.total||0)-(a.total||0)));
+  return groups;
+}
+function publicProtocolHTML(data){
+  const fs=groupResults(data,"fs");
+  const base=groupResults(data,"base");
+  const generated=new Date().toLocaleString("ru-RU");
+  const tableFs=g=>`<section><h2>${esc(g.label)} (${g.items.length})</h2><table><thead><tr><th>#</th><th>ФИО</th><th>Группа</th><th>Возраст</th><th>Комбо</th><th>Креатив</th><th>Штраф</th><th>Балл</th></tr></thead><tbody>${g.items.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.group||"")}</td><td>${esc(r.age||"")}</td><td>${esc(r.combo??0)}</td><td>${esc(r.creativity??0)}</td><td>${r.dsk?"ДСК":esc(r.penalties?("-"+r.penalties):"")}</td><td><b>${esc(r.total??0)}</b></td></tr>`).join("")}</tbody></table></section>`;
+  const tableBase=g=>`<section><h2>${esc(g.label)} (${g.items.length})</h2><table><thead><tr><th>#</th><th>ФИО</th><th>Группа</th><th>Возраст</th><th>Упражнения</th><th>Балл</th></tr></thead><tbody>${g.items.map((r,i)=>{const c=getBaseCategory(r.sex,r.age);const ex=(BASE_CAT_ORDER.includes(c.code)?(c.code):"");const list=Object.entries(r.exercises||{}).map(([k,v])=>`${EXERCISE_LABEL[k]||k}: ${v} × ${BASE_COEF[k]||1}`).join("; ");return `<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.group||"")}</td><td>${esc(r.age||"")}</td><td>${esc(list)}</td><td><b>${esc(r.total??0)}</b></td></tr>`}).join("")}</tbody></table></section>`;
+  const winners=groups=>Object.values(groups).filter(g=>g.items.length).map(g=>`<section><h2>${esc(g.label)}</h2><table><thead><tr><th>Место</th><th>ФИО</th><th>Группа</th><th>Балл</th></tr></thead><tbody>${g.items.filter(r=>!r.dsk).slice(0,3).map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.group||"")}</td><td><b>${esc(r.total??0)}</b></td></tr>`).join("")}</tbody></table></section>`).join("");
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>WU Open Protocol</title><style>body{margin:0;background:#f6f8fb;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:1040px;margin:0 auto;padding:20px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:22px 0 8px;color:#9a5b00}.muted{color:#6b7280;font-size:13px;margin-bottom:18px}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #d9e1e8}th,td{border-bottom:1px solid #e5eaf0;padding:8px;text-align:left;font-size:14px}th{background:#eef3f8;color:#374151}section{margin-bottom:18px}@media print{body{background:#fff}.wrap{max-width:none}}</style></head><body><div class="wrap"><h1>WU Open — протокол соревнований</h1><div class="muted">Сформировано: ${esc(generated)}</div><h1>Фристайл</h1>${Object.values(fs).filter(g=>g.items.length).map(tableFs).join("")||"<p>Нет результатов.</p>"}<h1>База / ОФП</h1>${Object.values(base).filter(g=>g.items.length).map(tableBase).join("")||"<p>Нет результатов.</p>"}<h1>Призёры фристайл</h1>${winners(fs)||"<p>Нет призёров.</p>"}<h1>Призёры база / ОФП</h1>${winners(base)||"<p>Нет призёров.</p>"}</div></body></html>`;
+}
+
+$("uploadCloud").onclick=async()=>{
+  try{
+    const d=readCurrent();
+    const fsCount=arr(d.open_freestyle_results).length;
+    if(!fsCount&&!confirm("В текущем браузере фристайл пустой. Всё равно отправить?"))return;
+    setCloudStatus("Отправка...");
+    const eventId=getCloudEventId();
+    const records=recordsForCloud(d);
+    const res=await fetch(`${CLOUD_API_BASE}/sync`,{
+      method:"POST",
+      headers:cloudHeaders(),
+      body:JSON.stringify({event_id:eventId,device_id:getCloudDeviceId(),since:null,records})
+    });
+    if(!res.ok)throw new Error(`Сервер ответил ${res.status}: ${await res.text()}`);
+    const data=await res.json();
+    const msg=`Отправлено в облако: участники ${arr(d.open_athletes).length}, фристайл ${fsCount}. Принято сервером: ${data.pushed.accepted}, конфликтов: ${data.pushed.conflicts.length}. Код: ${eventId}`;
+    setCloudStatus(msg);
+    log(msg);
+  }catch(e){
+    setCloudStatus("Ошибка отправки: "+e.message);
+    log("Ошибка отправки в облако: "+e.message);
+  }
+};
+$("loadCloud").onclick=async()=>{
+  try{
+    setCloudStatus("Загрузка...");
+    const eventId=getCloudEventId();
+    const res=await fetch(`${CLOUD_API_BASE}/sync?event_id=${encodeURIComponent(eventId)}&since=1970-01-01T00:00:00Z`,{headers:cloudHeaders()});
+    if(!res.ok)throw new Error(`Сервер ответил ${res.status}: ${await res.text()}`);
+    const data=await res.json();
+    const records=arr(data.records).filter(r=>!r.deleted);
+    const loaded=wrapData({
+      open_athletes:records.filter(r=>r.record_type==="athletes").map(r=>r.data),
+      open_freestyle_results:records.filter(r=>r.record_type==="freestyle_results").map(r=>r.data),
+      open_base_results:[]
+    },`cloud:${eventId}`);
+    sourceData=loaded;
+    setCloudStatus("Source загружен из облака: "+summary(sourceData));
+    log("Source cloud: "+summary(sourceData));
+  }catch(e){
+    setCloudStatus("Ошибка загрузки: "+e.message);
+    log("Ошибка загрузки из облака: "+e.message);
+  }
+};
+$("exportCurrent").onclick=()=>{
+  const d=readCurrent();
+  downloadJSON(`wu-open-snapshot-${nowStamp()}.json`,d);
+  $("currentSummary").textContent=summary(d);
+  log("Скачан snapshot текущего браузера: "+summary(d));
+};
+$("useCurrentAsGolden").onclick=()=>{
+  goldenData=readCurrent();
+  $("currentSummary").textContent="Golden загружен из текущего браузера: "+summary(goldenData);
+  log("Golden = текущий браузер: "+summary(goldenData));
+};
+$("goldenFile").onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  goldenData=await readFile(f,"golden-file");
+  log("Golden file: "+summary(goldenData));
+};
+$("sourceFile").onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  sourceData=await readFile(f,"source-file");
+  log("Source file: "+summary(sourceData));
+};
+$("runMerge").onclick=()=>{
+  if(!goldenData||!sourceData){alert("Нужны Golden и Source snapshots");return;}
+  const policy=$("conflictPolicy").value;
+  const res=mergeOpenData(goldenData,sourceData,policy);
+  mergedData=res.merged;
+  lastReport=res.report;
+  renderReport(res.report);
+  $("downloadMerged").disabled=false;
+  $("downloadPublic").disabled=false;
+  $("applyMerged").disabled=$("applyConfirm").value.trim()!=="ПРИМЕНИТЬ";
+  log(`Merged собран. ${summary(mergedData)}. Добавлено FS: ${res.report.added.length}, конфликты: ${res.report.conflicts.length}, неизвестные: ${res.report.unknown.length}`);
+};
+$("downloadMerged").onclick=()=>{
+  if(!mergedData)return;
+  downloadJSON(`wu-open-merged-${nowStamp()}.json`,mergedData);
+};
+$("downloadPublic").onclick=()=>{
+  if(!mergedData)return;
+  downloadText(`wu-open-public-protocol-${nowStamp()}.html`,publicProtocolHTML(mergedData));
+};
+$("applyConfirm").oninput=()=>{
+  $("applyMerged").disabled=!mergedData||$("applyConfirm").value.trim()!=="ПРИМЕНИТЬ";
+};
+$("applyMerged").onclick=()=>{
+  if(!mergedData)return;
+  if($("applyConfirm").value.trim()!=="ПРИМЕНИТЬ")return;
+  const backup=readCurrent();
+  downloadJSON(`wu-open-BACKUP-before-apply-${nowStamp()}.json`,backup);
+  localStorage.setItem("open_backup_"+Date.now(),JSON.stringify(backup));
+  localStorage.setItem("open_athletes",JSON.stringify(mergedData.open_athletes));
+  localStorage.setItem("open_freestyle_results",JSON.stringify(mergedData.open_freestyle_results));
+  localStorage.setItem("open_base_results",JSON.stringify(mergedData.open_base_results));
+  $("applyStatus").textContent="Merged применён. Backup скачан и сохранён в localStorage. Открой open.html и проверь.";
+  log("Merged применён в localStorage текущего браузера.");
+};
+
+const current=readCurrent();
+initCloudEventId();
+$("currentSummary").textContent=summary(current);
+log("Текущий браузер: "+summary(current));
+</script>
+</body>
+</html>
