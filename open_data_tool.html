@@ -58,18 +58,18 @@ pre{white-space:pre-wrap;overflow:auto;max-height:320px;background:#101820;borde
   <div class="grid" style="margin-top:14px">
     <div class="panel ok full">
       <h2>Быстро через облако</h2>
-      <p>На Mac с фристайлом отправь данные в облако. На основном Mac загрузи их как Source и запусти dry-run merge.</p>
+      <p>На удалённом компьютере в <code>open.html</code> нажми «Отправить протокол». На основном Mac забирать из облака нужно только фристайл и потом запускать dry-run merge.</p>
       <div class="row">
         <label>Код обмена <input id="cloudEventId" type="text"/></label>
-        <button class="primary" id="uploadCloud">Отправить фристайл в облако</button>
-        <button id="loadCloud">Загрузить Source из облака</button>
+        <button class="primary" id="uploadCloud">Отправить фристайл (резерв)</button>
+        <button id="loadCloud">Забрать фристайл</button>
       </div>
       <div id="cloudStatus" class="muted"></div>
     </div>
 
     <div class="panel">
       <h2>1. Экспорт текущего компьютера</h2>
-      <p>Открой эту страницу на том же адресе GitHub Pages, где открывался протокол, и скачай снимок данных.</p>
+      <p>Открой эту страницу на том же origin, где лежит golden-localStorage этого компьютера. Для основного Mac это обычно localhost.</p>
       <div class="row">
         <button class="primary" id="exportCurrent">Скачать snapshot текущего браузера</button>
         <button id="useCurrentAsGolden">Взять текущие как Golden</button>
@@ -79,7 +79,7 @@ pre{white-space:pre-wrap;overflow:auto;max-height:320px;background:#101820;borde
 
     <div class="panel">
       <h2>2. Загрузка двух snapshots</h2>
-      <p>Golden = MacBook. Source = другой компьютер с результатами фристайла.</p>
+      <p>Golden = основной Mac / localhost. Source = другой компьютер с результатами фристайла.</p>
       <div class="row">
         <label>Golden JSON <input id="goldenFile" type="file" accept=".json,application/json"/></label>
       </div>
@@ -124,10 +124,10 @@ pre{white-space:pre-wrap;overflow:auto;max-height:320px;background:#101820;borde
   </div>
 </div>
 
+<script src="open_cloud_sync.js"></script>
 <script>
 const KEYS=["open_athletes","open_freestyle_results","open_base_results"];
-const CLOUD_API_BASE="https://api.workoutudm.ru/api/competition";
-const CLOUD_API_KEY="SggpROWNGUNVTdWFYXmNmBZGzyoJp91E-7c5bEz8zdE";
+const CloudSync=window.WuOpenCloudSync;
 const FREESTYLE_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus"];
 const BASE_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus_triathlon"];
 const BASE_COEF={otj:0.5,press:0.5,podt:2,br:1,vyh:3};
@@ -145,58 +145,14 @@ function arr(v){return Array.isArray(v)?v:[]}
 function nowStamp(){return new Date().toISOString().replace(/[:.]/g,"-")}
 function norm(s){return String(s||"").toLowerCase().replace(/ё/g,"е").replace(/[.,;:!?()\\[\\]{}\"'`]/g," ").replace(/\\s+/g," ").trim()}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
-function defaultCloudEventId(){return "wu-open-transfer-"+new Date().toISOString().slice(0,10).replace(/-/g,"")}
 function initCloudEventId(){
-  const saved=localStorage.getItem("open_cloud_event_id")||"";
-  $("cloudEventId").value=saved||defaultCloudEventId();
+  const saved=CloudSync.getSavedCloudEventId(localStorage)||"";
+  $("cloudEventId").value=saved||CloudSync.defaultCloudEventId();
 }
 function getCloudEventId(){
-  const id=$("cloudEventId").value.trim();
-  if(!/^[a-zA-Z0-9-]{1,64}$/.test(id))throw new Error("Код обмена: только латиница, цифры и дефис, до 64 символов");
-  localStorage.setItem("open_cloud_event_id",id);
-  return id;
+  return CloudSync.saveCloudEventId(localStorage,$("cloudEventId").value.trim());
 }
 function setCloudStatus(msg){$("cloudStatus").textContent=msg;}
-function cloudHeaders(){return{"Content-Type":"application/json","X-API-Key":CLOUD_API_KEY};}
-function getCloudDeviceId(){
-  let id=localStorage.getItem("comp_device_id");
-  if(!id){id=crypto.randomUUID();localStorage.setItem("comp_device_id",id);}
-  return id;
-}
-function hashKey(s){
-  let h=2166136261;
-  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
-  return (h>>>0).toString(36);
-}
-function recordKey(item,type,i){
-  const raw=String((item&&item.id)||(item&&item.name)||`${type}-${i}`);
-  return raw.length<=32?raw:`${raw.slice(0,23)}-${hashKey(raw).slice(0,8)}`;
-}
-function jsonSize(obj){return new Blob([JSON.stringify(obj)]).size;}
-function compactRecord(type,item){
-  if(jsonSize(item)<=9500)return item;
-  if(type==="freestyle_results"){
-    const copy={...item};
-    delete copy.log;
-    copy.log_trimmed=true;
-    return copy;
-  }
-  return item;
-}
-function recordsForCloud(data){
-  const now=new Date().toISOString();
-  const records=[];
-  const add=(recordType,items)=>{
-    arr(items).forEach((item,i)=>{
-      const data=compactRecord(recordType,item);
-      if(jsonSize(data)>9500)throw new Error(`Запись слишком большая для облака: ${recordType} ${recordKey(item,recordType,i)}`);
-      records.push({record_type:recordType,record_key:recordKey(item,recordType,i),data,updated_at:now});
-    });
-  };
-  add("athletes",data.open_athletes);
-  add("freestyle_results",data.open_freestyle_results);
-  return records;
-}
 function readCurrent(){
   const data={};
   for(const k of KEYS)data[k]=safeParse(localStorage.getItem(k)||"[]",[]);
@@ -415,16 +371,15 @@ $("uploadCloud").onclick=async()=>{
     const fsCount=arr(d.open_freestyle_results).length;
     if(!fsCount&&!confirm("В текущем браузере фристайл пустой. Всё равно отправить?"))return;
     setCloudStatus("Отправка...");
-    const eventId=getCloudEventId();
-    const records=recordsForCloud(d);
-    const res=await fetch(`${CLOUD_API_BASE}/sync`,{
-      method:"POST",
-      headers:cloudHeaders(),
-      body:JSON.stringify({event_id:eventId,device_id:getCloudDeviceId(),since:null,records})
+    const result=await CloudSync.uploadFreestyleSnapshot({
+      data:d,
+      eventId:getCloudEventId(),
+      storage:localStorage,
+      fetchImpl:window.fetch.bind(window)
     });
-    if(!res.ok)throw new Error(`Сервер ответил ${res.status}: ${await res.text()}`);
-    const data=await res.json();
-    const msg=`Отправлено в облако: участники ${arr(d.open_athletes).length}, фристайл ${fsCount}. Принято сервером: ${data.pushed.accepted}, конфликтов: ${data.pushed.conflicts.length}. Код: ${eventId}`;
+    if(result.cancelled){setCloudStatus("Отправка отменена");return;}
+    const pushed=result.response?.pushed||{accepted:0,conflicts:[]};
+    const msg=`Отправлено в облако: фристайл ${fsCount}. Принято сервером: ${pushed.accepted}, конфликтов: ${pushed.conflicts.length}. Код: ${result.eventId}`;
     setCloudStatus(msg);
     log(msg);
   }catch(e){
@@ -435,17 +390,13 @@ $("uploadCloud").onclick=async()=>{
 $("loadCloud").onclick=async()=>{
   try{
     setCloudStatus("Загрузка...");
-    const eventId=getCloudEventId();
-    const res=await fetch(`${CLOUD_API_BASE}/sync?event_id=${encodeURIComponent(eventId)}&since=1970-01-01T00:00:00Z`,{headers:cloudHeaders()});
-    if(!res.ok)throw new Error(`Сервер ответил ${res.status}: ${await res.text()}`);
-    const data=await res.json();
-    const records=arr(data.records).filter(r=>!r.deleted);
-    const loaded=wrapData({
-      open_athletes:records.filter(r=>r.record_type==="athletes").map(r=>r.data),
-      open_freestyle_results:records.filter(r=>r.record_type==="freestyle_results").map(r=>r.data),
-      open_base_results:[]
-    },`cloud:${eventId}`);
-    sourceData=loaded;
+    const result=await CloudSync.loadCloudFreestyleSource({
+      eventId:getCloudEventId(),
+      storage:localStorage,
+      fetchImpl:window.fetch.bind(window)
+    });
+    if(result.cancelled){setCloudStatus("Загрузка отменена");return;}
+    sourceData=result.snapshot;
     setCloudStatus("Source загружен из облака: "+summary(sourceData));
     log("Source cloud: "+summary(sourceData));
   }catch(e){
