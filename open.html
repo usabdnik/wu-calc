@@ -116,11 +116,11 @@ function getFreestyleCategory(sex,age){
   return {code:"boys_15plus",label:"Мальчики 15+"};
 }
 
-/* База/ОФП: девочки все, мальчики <10, 11-15, 15+ (троеборье) */
+/* База/ОФП: девочки все, мальчики <10, 11-14, 15+ (троеборье) */
 function getBaseCategory(sex,age){
   if(sex==="ж")return {code:"girls_all",label:"Девочки"};
   if(age<=10)return {code:"boys_u10",label:"Мальчики до 10"};
-  if(age<=15)return {code:"boys_11_15",label:"Мальчики 11–15"};
+  if(age<=14)return {code:"boys_11_14",label:"Мальчики 11–14"};
   return {code:"boys_15plus_triathlon",label:"Мальчики 15+ (троеборье)"};
 }
 
@@ -131,12 +131,12 @@ const EXERCISE_LABEL={otj:"Отжимания",press:"Пресс",podt:"Подт
 const BASE_EXERCISES={
   "girls_all":["press","otj"],
   "boys_u10":["otj","press"],
-  "boys_11_15":["podt","otj"],
+  "boys_11_14":["podt","otj"],
   "boys_15plus_triathlon":["vyh","br","podt"]
 };
 
 const FREESTYLE_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus"];
-const BASE_CAT_ORDER=["girls_all","boys_u10","boys_11_15","boys_15plus_triathlon"];
+const BASE_CAT_ORDER=["girls_all","boys_u10","boys_11_14","boys_15plus_triathlon"];
 
 /* ========== LS HELPERS ========== */
 function loadLS(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
@@ -384,6 +384,15 @@ function JudgeBaseTab({athletes,baseResults,setBaseResults,showToast}){
   const available=athletes.filter(a=>a.base!==false&&a.present!==false);
   const selected=available.find(a=>a.id===selId);
   const [reps,setReps]=useState({});
+  /* id уже засуженных в базе — для ✓ */
+  const judgedBaseIds=useMemo(()=>new Set(baseResults.map(r=>String(r.id))),[baseResults]);
+  /* Группировка доступных по категориям базы для optgroup */
+  const availableByCat=useMemo(()=>{
+    const g={};BASE_CAT_ORDER.forEach(c=>{g[c]=[];});
+    available.forEach(a=>{const c=getBaseCategory(a.sex,a.age).code;if(g[c])g[c].push(a);});
+    return g;
+  },[available]);
+  const BASE_CAT_LABELS={girls_all:"Девочки",boys_u10:"Мальчики до 10",boys_11_14:"Мальчики 11–14",boys_15plus_triathlon:"Мальчики 15+ (троеборье)"};
 
   useEffect(()=>{
     /* Подхватить существующий результат */
@@ -396,11 +405,21 @@ function JudgeBaseTab({athletes,baseResults,setBaseResults,showToast}){
 
   if(!selected){
     return <div className="card">
-      <h3 style={{color:"#f59e0b",marginBottom:12}}>Выбор участника (база/ОФП)</h3>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h3 style={{color:"#f59e0b"}}>Выбор участника (база/ОФП)</h3>
+        <div style={{fontSize:11,color:"#64748b"}}>засужено {judgedBaseIds.size}/{available.length}</div>
+      </div>
       {available.length===0?<div className="empty">Нет явившихся участников базы. Проверь вкладку «Участники».</div>:
       <select value={selId} onChange={e=>setSelId(e.target.value)}>
         <option value="">— Выбери участника —</option>
-        {available.map(a=><option key={a.id} value={a.id}>{a.name} ({a.sex==="ж"?"Ж":"М"}, {a.age} лет)</option>)}
+        {BASE_CAT_ORDER.map(code=>{
+          const list=availableByCat[code]||[];
+          if(list.length===0)return null;
+          const left=list.filter(a=>!judgedBaseIds.has(String(a.id))).length;
+          return <optgroup key={code} label={`${BASE_CAT_LABELS[code]} (${left} осталось / ${list.length})`}>
+            {list.map(a=>{const done=judgedBaseIds.has(String(a.id));return <option key={a.id} value={a.id} style={done?{color:"#22c55e"}:{}}>{done?"✓ ":""}{a.name} ({a.sex==="ж"?"Ж":"М"}, {a.age} лет)</option>;})}
+          </optgroup>;
+        })}
       </select>}
     </div>;
   }
