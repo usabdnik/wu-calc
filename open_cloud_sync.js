@@ -19,6 +19,14 @@
     return new Date().toISOString();
   }
 
+  function cloudDatePart(date) {
+    const value = date instanceof Date ? date : new Date();
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+  }
+
   function wrapData(data, source) {
     return {
       kind: "wu-open-data",
@@ -32,8 +40,11 @@
   }
 
   function defaultCloudEventId(date) {
-    const value = date instanceof Date ? date : new Date();
-    return "wu-open-transfer-" + value.toISOString().slice(0, 10).replace(/-/g, "");
+    return "wu-open-transfer-" + cloudDatePart(date).replace(/-/g, "");
+  }
+
+  function defaultCloudEventName(date) {
+    return "WU Open Transfer " + cloudDatePart(date);
   }
 
   function normalizeCloudEventId(eventId) {
@@ -153,6 +164,25 @@
     };
   }
 
+  async function ensureCloudEvent(options) {
+    const opts = options || {};
+    const fetchImpl = opts.fetchImpl || fetch;
+    const eventId = normalizeCloudEventId(opts.eventId || defaultCloudEventId(opts.date));
+    const response = await fetchImpl((opts.apiBase || CLOUD_API_BASE) + "/events", {
+      method: "POST",
+      headers: cloudHeaders(),
+      body: JSON.stringify({
+        id: eventId,
+        name: opts.name || defaultCloudEventName(opts.date),
+        date: cloudDatePart(opts.date),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error("Сервер не создал канал обмена " + response.status + ": " + await response.text());
+    }
+    return response.json();
+  }
+
   async function uploadFreestyleSnapshot(options) {
     const opts = options || {};
     const fetchImpl = opts.fetchImpl || fetch;
@@ -166,6 +196,12 @@
       return { cancelled: true, eventId: null, records: [] };
     }
     const records = buildFreestyleSyncRecords(opts.data, opts.updatedAt);
+    await ensureCloudEvent({
+      apiBase: opts.apiBase,
+      date: opts.date,
+      eventId,
+      fetchImpl,
+    });
     const response = await fetchImpl((opts.apiBase || CLOUD_API_BASE) + "/sync", {
       method: "POST",
       headers: cloudHeaders(),
@@ -228,6 +264,8 @@
     cloudHeaders,
     cloudSourceFromPullRecords,
     defaultCloudEventId,
+    defaultCloudEventName,
+    ensureCloudEvent,
     getCloudDeviceId,
     getSavedCloudEventId,
     loadCloudFreestyleSource,

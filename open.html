@@ -190,13 +190,12 @@ function App(){
       const result=await OpenCloudSync.uploadFreestyleSnapshot({
         data:{open_freestyle_results:fsResults},
         storage:window.localStorage,
-        promptFn:(message,defaultValue)=>window.prompt(message,defaultValue),
         fetchImpl:window.fetch.bind(window)
       });
       if(result.cancelled){showToast("Отправка отменена");return;}
       const pushed=result.response?.pushed||{accepted:0,conflicts:[]};
       const conflicts=Array.isArray(pushed.conflicts)?pushed.conflicts.length:0;
-      showToast(`Фристайл отправлен: ${pushed.accepted} · код ${result.eventId}${conflicts?` · конфликты ${conflicts}`:""}`);
+      showToast(`Фристайл отправлен: ${pushed.accepted}${conflicts?` · конфликты ${conflicts}`:""}`);
     }catch(e){showToast("Ошибка отправки: "+e.message);}
     finally{setCloudSending(false);}
   }
