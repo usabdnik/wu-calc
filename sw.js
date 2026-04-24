@@ -1,4 +1,4 @@
-const CACHE = 'wu-calc-v11';
+const CACHE = 'wu-calc-v12';
 const URLS = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const URLS = [
   './competition.html',
   './open.html',
   './open_calc.html',
+  './open_cloud_sync.js',
   './x7k-monitor.html',
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
