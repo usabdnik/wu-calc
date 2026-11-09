@@ -668,7 +668,7 @@ function App(){
   const tot=raw+b-penaltyScore;
   const comboOk=slots.some(s=>s.length>=3);
   const sOk=minS<=0||tot>=minS;
-  const ownLevelCount=all.filter(e=>e.score===lv.num).length;
+  const ownLevelCount=all.filter(e=>e.score===lv.num||e.score===lv.num+0.5).length; /* как Data2!D9 таблицы: N и N+0,5 */
   const eOk=lv.minEl<=0||ownLevelCount>=lv.minEl;
   const add=(i,el)=>setSlots(p=>{const n=[...p];n[i]=[...n[i],el];return n;});
   const rem=(i,nm)=>setSlots(p=>{const n=[...p];n[i]=n[i].filter(e=>e.name!==nm);return n;});
