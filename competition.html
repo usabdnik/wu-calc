@@ -1618,6 +1618,16 @@ function App(){
   useEffect(()=>saveLSTracked("comp_base_results",baseResults,syncMgr),[baseResults]);
   useEffect(()=>saveLSTracked("comp_age_categories_freestyle",ageCatsF,syncMgr),[ageCatsF]);
   useEffect(()=>saveLSTracked("comp_age_categories_base",ageCatsB,syncMgr),[ageCatsB]);
+  /* Калькуляторы пишут результаты прямо в localStorage. Подхватываем их из соседней вкладки
+     и при возврате «назад» (страница из кэша), иначе старое состояние затрёт их при следующем сохранении. */
+  useEffect(()=>{
+    function reloadResults(){setFreestyleResults(loadLS("comp_freestyle_results",[]));setBaseResults(loadLS("comp_base_results",[]));}
+    function onStorage(e){if(e.key==="comp_freestyle_results"||e.key==="comp_base_results")reloadResults();}
+    function onPageShow(e){if(e.persisted)reloadResults();}
+    window.addEventListener("storage",onStorage);
+    window.addEventListener("pageshow",onPageShow);
+    return()=>{window.removeEventListener("storage",onStorage);window.removeEventListener("pageshow",onPageShow);};
+  },[]);
 
   const showToast=useCallback((msg)=>setToastMsg(msg),[]);
 
