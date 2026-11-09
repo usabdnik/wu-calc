@@ -111,3 +111,12 @@ test("дисквалифицированный не попадает в приз
   assert.doesNotMatch(text, /Аверин Антон/, "ДСК не в призах");
   assert.match(text, /Гусев Глеб/, "третье место — следующий по баллам");
 });
+
+test("ребёнок заявлен и во freestyle, и в base с одним id: оценка во freestyle не ставит ✓ его строке base", async () => {
+  const E = athlete("e5", "Егоров Егор");
+  const page = await openProtocol({ comp_athletes: [E, { ...E, level: "BASE 2", dir: "base" }] });
+  await judgeFreestyle(page, "Егоров Егор", 10);
+  const option = dir => `[...document.querySelectorAll("option")].find(o => o.textContent.endsWith("(${dir})")).textContent`;
+  await page.waitFor(`${option("freestyle")}.startsWith("✓")`);
+  assert.ok(!(await page.eval(`${option("base")}.startsWith("✓")`)), "выступление в base ещё не оценено");
+});
