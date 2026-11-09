@@ -529,12 +529,13 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
     return athletes.map((a,i)=>({...a,_idx:i})).filter(a=>a.present!==false&&(filter==="all"||a.dir===filter));
   },[athletes,filter]);
 
-  const judgedIds=useMemo(()=>{
+  const judgedKeys=useMemo(()=>{
     const s=new Set();
-    freestyleResults.forEach(r=>s.add(r.id));
-    baseResults.forEach(r=>s.add(r.id));
+    freestyleResults.forEach(r=>s.add("freestyle:"+r.id));
+    baseResults.forEach(r=>s.add("base:"+r.id));
     return s;
   },[freestyleResults,baseResults]);
+  const isJudged=a=>judgedKeys.has(a.dir+":"+a.id); /* один ребёнок может быть заявлен в обоих направлениях с одним id */
 
   const selected=selIdx!==""?athletes[parseInt(selIdx)]:null;
 
@@ -544,7 +545,7 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
   useEffect(()=>{resetFreestyleForm();resetBaseForm()},[selIdx]);
 
   function selectNextUnjudged(){
-    const next=filtered.find(a=>!judgedIds.has(a.id)&&a._idx!==parseInt(selIdx));
+    const next=filtered.find(a=>!isJudged(a)&&a._idx!==parseInt(selIdx));
     if(next)setSelIdx(String(next._idx));
     else setSelIdx("");
   }
@@ -618,8 +619,8 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
           <label>Спортсмен</label>
           <select value={selIdx} onChange={e=>setSelIdx(e.target.value)}>
             <option value="">— Выберите —</option>
-            {filtered.map(a=><option key={a._idx} value={a._idx} style={judgedIds.has(a.id)?{color:"#22c55e"}:{}}>
-              {judgedIds.has(a.id)?"✓ ":""}{a.name} — {a.level} ({a.dir})
+            {filtered.map(a=><option key={a._idx} value={a._idx} style={isJudged(a)?{color:"#22c55e"}:{}}>
+              {isJudged(a)?"✓ ":""}{a.name} — {a.level} ({a.dir})
             </option>)}
           </select>
         </div>
