@@ -942,7 +942,7 @@ function AgeCatEditor({label,color,cats,setCats}){
 
 function WinnersTab({athletes,freestyleResults,baseResults,ageCatsF,setAgeCatsF,ageCatsB,setAgeCatsB}){
   const absentIds=useMemo(()=>new Set(athletes.filter(a=>a.present===false).map(a=>a.id)),[athletes]);
-  const passedF=useMemo(()=>freestyleResults.filter(r=>!absentIds.has(r.id)).sort((a,b)=>b.total-a.total),[freestyleResults,absentIds]);
+  const passedF=useMemo(()=>freestyleResults.filter(r=>!absentIds.has(r.id)&&!r.dsk).sort((a,b)=>b.total-a.total),[freestyleResults,absentIds]); /* ДСК не в призы, как в open.html */
   const passedB=useMemo(()=>baseResults.filter(r=>!absentIds.has(r.id)).sort((a,b)=>b.score-a.score),[baseResults,absentIds]);
 
   function getWinners(results,cats){
