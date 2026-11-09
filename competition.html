@@ -658,6 +658,7 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
 
 function FreestyleJudging({athlete,statika,setStatika,dynamika,setDynamika,combo,setCombo,universality,setUniversality,creative,setCreative,dirty,setDirty,fall,setFall,dsk,setDsk,comboCheck,setComboCheck,minElCheck,setMinElCheck,onSave}){
   const lvl=findLevel(athlete.level);
+  if(!lvl)return <div className="card"><div className="empty">Уровень {athlete.level} не найден во фристайле — исправьте уровень или направление во вкладке «Участники»</div></div>;
   const penalties=dirty*2+fall*4;
   const total=statika+dynamika+combo+universality+creative-penalties;
   const minScore=athlete.sex==="ж"?lvl.minF:lvl.minM;
