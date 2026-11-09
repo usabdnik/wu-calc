@@ -531,8 +531,8 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
 
   const judgedIds=useMemo(()=>{
     const s=new Set();
-    freestyleResults.forEach(r=>s.add(r.athleteIdx));
-    baseResults.forEach(r=>s.add(r.athleteIdx));
+    freestyleResults.forEach(r=>s.add(r.id));
+    baseResults.forEach(r=>s.add(r.id));
     return s;
   },[freestyleResults,baseResults]);
 
@@ -544,7 +544,7 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
   useEffect(()=>{resetFreestyleForm();resetBaseForm()},[selIdx]);
 
   function selectNextUnjudged(){
-    const next=filtered.find(a=>!judgedIds.has(a._idx)&&a._idx!==parseInt(selIdx));
+    const next=filtered.find(a=>!judgedIds.has(a.id)&&a._idx!==parseInt(selIdx));
     if(next)setSelIdx(String(next._idx));
     else setSelIdx("");
   }
@@ -566,7 +566,7 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
       penalties,total:Math.round(total*100)/100,passed
     };
     setFreestyleResults(prev=>{
-      const exists=prev.findIndex(r=>r.athleteIdx===result.athleteIdx);
+      const exists=prev.findIndex(r=>r.id===result.id);
       if(exists>=0){const n=[...prev];n[exists]=result;return n}
       return [...prev,result];
     });
@@ -597,7 +597,7 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
       score:Math.round(score*100)/100,passed:allPassed,checks
     };
     setBaseResults(prev=>{
-      const exists=prev.findIndex(r=>r.athleteIdx===result.athleteIdx);
+      const exists=prev.findIndex(r=>r.id===result.id);
       if(exists>=0){const n=[...prev];n[exists]=result;return n}
       return [...prev,result];
     });
@@ -618,8 +618,8 @@ function JudgingTab({athletes,freestyleResults,setFreestyleResults,baseResults,s
           <label>Спортсмен</label>
           <select value={selIdx} onChange={e=>setSelIdx(e.target.value)}>
             <option value="">— Выберите —</option>
-            {filtered.map(a=><option key={a._idx} value={a._idx} style={judgedIds.has(a._idx)?{color:"#22c55e"}:{}}>
-              {judgedIds.has(a._idx)?"✓ ":""}{a.name} — {a.level} ({a.dir})
+            {filtered.map(a=><option key={a._idx} value={a._idx} style={judgedIds.has(a.id)?{color:"#22c55e"}:{}}>
+              {judgedIds.has(a.id)?"✓ ":""}{a.name} — {a.level} ({a.dir})
             </option>)}
           </select>
         </div>
