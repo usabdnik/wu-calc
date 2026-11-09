@@ -861,7 +861,7 @@ function App(){
           total:Math.round(r.tot*100)/100,
           judgedAt:new Date().toISOString()
         };
-        sendToProtocol({...a,level:r.lv.name},{statika,dynamika,combo:Math.round(r.b*100)/100,universality:0,creative:0,dirty:dirtyCount,fall:fallCount,dsk:isDQ,comboCheck:true,minElCheck:true,penalties:penaltyScore,total:Math.round(r.tot*100)/100,passed:!isDQ,log});
+        sendToProtocol({...a,level:isDQ?a.level:r.lv.name},{statika,dynamika,combo:Math.round(r.b*100)/100,universality:0,creative:0,dirty:dirtyCount,fall:fallCount,dsk:isDQ,comboCheck:true,minElCheck:true,penalties:penaltyScore,total:Math.round(r.tot*100)/100,passed:!isDQ,log});
         setProtocolSent("В протокол: "+a.name+" — "+(isDQ?"ДСК":r.lv.name+" — "+r.tot.toFixed(1)+" б."));
         setTimeout(()=>setProtocolSent(""),4000);
       }} style={{marginTop:8,marginLeft:8,padding:"8px 20px",borderRadius:10,border:"1px solid rgba(168,85,247,0.3)",background:"rgba(168,85,247,0.1)",color:"#a855f7",fontSize:13,fontWeight:600,cursor:"pointer"}}>В протокол</button>}
